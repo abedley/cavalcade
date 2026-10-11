@@ -1,3 +1,4 @@
+export { attachComputerPlayers, chooseCard, chooseDiscards, computerAction } from './ai.js';
 export { COLORS, createDeck, seededRandom, shuffle } from './cards.js';
 export { Emitter } from './emitter.js';
 export {

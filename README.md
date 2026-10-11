@@ -32,6 +32,17 @@ game.dispatch({ type: ActionType.DISCARD_CARDS, player: 0, cardIds: ['blue-7', '
 | `gameOver`      | `{ scores, majorities, winners }`                |
 | `invalidAction` | `{ action, message }`. State is unchanged        |
 
+### Computer players
+
+```js
+import { attachComputerPlayers } from './src/index.js';
+
+// Players 1 and 2 are computers; they move 500ms after it becomes their turn.
+const stop = attachComputerPlayers(game, [1, 2], { delay: 500 });
+```
+
+The computer is greedy. Each turn it plays the card that adds the fewest points to its own score, counting colour majorities as the game stands. Ties go to the card that takes fewer cards, then to the higher-value card. At the end it discards the two cards that would cost it the most. It only sees what that player could see (`getStateFor`). `chooseCard`, `chooseDiscards` and `computerAction` are exported for use without the controller.
+
 `game.getState()` returns the full state; `game.getStateFor(i)` hides opponents' hands. Pass `random: seededRandom(n)` to the constructor for reproducible games.
 
 ## Rules implemented
@@ -44,7 +55,7 @@ game.dispatch({ type: ActionType.DISCARD_CARDS, player: 0, cardIds: ['blue-7', '
 
 ## Debug board
 
-`index.html` is a bare-bones hot-seat page for trying the engine in a browser. It is served by GitHub Pages at https://abedley.github.io/cavalcade/. Tapping a card previews which parade cards it would take; tapping it again plays it. Locally, run `python3 -m http.server` and open http://localhost:8000/. ES modules don't load from `file://`.
+`index.html` is a bare-bones page for trying the engine in a browser: you play P1 against 1–5 computer players. It is served by GitHub Pages at https://abedley.github.io/cavalcade/. Tapping a card previews which parade cards it would take; tapping it again plays it. Locally, run `python3 -m http.server` and open http://localhost:8000/. ES modules don't load from `file://`.
 
 ## Development
 

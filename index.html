@@ -53,15 +53,15 @@
 </head>
 <body>
 <h1>Cavalcade debug board</h1>
-<p class="muted">Hot-seat test page for the game engine. Tap a card in the current hand to preview the play
-  (red outline = cards that would be removed, underline = safe zone), then tap it again to play.</p>
+<p class="muted">Test page for the game engine. You are P1; everyone else is a computer. On your turn, tap a card
+  to preview the play (red outline = cards you would take, underline = safe zone), then tap it again to play.</p>
 
 <section>
   <div class="row">
     <label>Players <select id="count"></select></label>
     <label>Seed <input id="seed" type="number" placeholder="random"></label>
     <button class="btn" id="start">New game</button>
-    <label class="row"><input type="checkbox" id="showAll" checked> Show all hands</label>
+    <label class="row"><input type="checkbox" id="showAll"> Show computer hands</label>
   </div>
 </section>
 
@@ -81,13 +81,15 @@
 </div>
 
 <script type="module">
-import { Game, GameEvent, ActionType, Phase, DISCARD_COUNT, MIN_PLAYERS, MAX_PLAYERS,
+import { attachComputerPlayers, Game, GameEvent, ActionType, Phase, DISCARD_COUNT, MIN_PLAYERS, MAX_PLAYERS,
   resolvePlay, seededRandom } from './src/index.js';
 
 const $ = (id) => document.getElementById(id);
 for (let n = MIN_PLAYERS; n <= MAX_PLAYERS; n++) $('count').add(new Option(n, n));
 
-let game, state, seed;
+const HUMAN = 0;
+const CPU_DELAY_MS = 700;
+let game, state, seed, stopComputers;
 let selected = new Set(); // card ids selected in the current interaction
 
 function cardEl(card, { small = false, tag = 'div', classes = [] } = {}) {
@@ -110,9 +112,10 @@ const nameOf = (i) => state.players[i].name;
 
 function newGame() {
   const count = Number($('count').value);
+  stopComputers?.();
   seed = $('seed').value === '' ? Math.floor(Math.random() * 1e6) : Number($('seed').value);
   game = new Game({
-    players: Array.from({ length: count }, (_, i) => `P${i + 1}`),
+    players: Array.from({ length: count }, (_, i) => (i === HUMAN ? 'P1 (you)' : `P${i + 1} (cpu)`)),
     random: seededRandom(seed),
   });
   $('log').replaceChildren();
@@ -126,6 +129,8 @@ function newGame() {
   game.on(GameEvent.INVALID_ACTION, ({ message }) => log(`Invalid: ${message}`, 'err'));
   game.on(GameEvent.GAME_OVER, ({ winners }) => log(`Game over. Winner: ${winners.map(nameOf).join(', ')}`));
   $('game').hidden = false;
+  stopComputers = attachComputerPlayers(game, [...Array(count).keys()].filter((i) => i !== HUMAN),
+    { delay: CPU_DELAY_MS });
   game.start();
   log(`New game, seed ${seed}. ${nameOf(state.currentPlayer)} starts.`);
 }
@@ -141,7 +146,7 @@ function previewRemoval() {
 
 function onHandCard(playerIndex, card) {
   if (state.phase === Phase.PLAY) {
-    if (playerIndex !== state.currentPlayer) return;
+    if (playerIndex !== HUMAN || state.currentPlayer !== HUMAN) return;
     if (selected.has(card.id)) {
       selected.clear();
       game.dispatch({ type: ActionType.PLAY_CARD, player: playerIndex, cardId: card.id });
@@ -149,18 +154,16 @@ function onHandCard(playerIndex, card) {
     }
     selected = new Set([card.id]);
   } else if (state.phase === Phase.DISCARD) {
-    if (playerIndex !== discardingPlayer()) return;
+    if (playerIndex !== HUMAN || state.players[HUMAN].hasDiscarded) return;
     if (selected.has(card.id)) selected.delete(card.id);
     else if (selected.size < DISCARD_COUNT) selected.add(card.id);
   }
   render();
 }
 
-const discardingPlayer = () => state.players.findIndex((p) => !p.hasDiscarded);
 
 function render() {
   const preview = previewRemoval();
-  const showAll = $('showAll').checked;
 
   $('deck').textContent = state.deckCount;
   $('paradeCount').textContent = `(${state.parade.length})`;
@@ -173,11 +176,13 @@ function render() {
   if (state.phase === Phase.PLAY) {
     const fr = state.finalRound;
     $('status').textContent = `${nameOf(state.currentPlayer)} to play`
+      + (state.currentPlayer === HUMAN ? '' : ' (thinking…)')
       + (fr ? ` — final round, ${fr.turnsRemaining} turn(s) left` : '')
       + (preview ? ` — would take ${preview.removedIds.size} card(s). Tap again to play.` : '');
+  } else if (state.phase === Phase.DISCARD && state.players[HUMAN].hasDiscarded) {
+    $('status').textContent = 'Waiting for the computers to discard…';
   } else if (state.phase === Phase.DISCARD) {
-    const p = discardingPlayer();
-    $('status').textContent = `${nameOf(p)}: choose ${DISCARD_COUNT} cards to discard (${selected.size}/${DISCARD_COUNT}). The rest go to your collection.`;
+    $('status').textContent = `Choose ${DISCARD_COUNT} cards to discard (${selected.size}/${DISCARD_COUNT}). The rest go to your collection.`;
     const btn = document.createElement('button');
     btn.className = 'btn';
     btn.textContent = 'Discard';
@@ -185,17 +190,20 @@ function render() {
     btn.onclick = () => {
       const cardIds = [...selected];
       selected.clear();
-      if (game.dispatch({ type: ActionType.DISCARD_CARDS, player: p, cardIds })) {
-        log(`${nameOf(p)} discarded ${cardIds.join(', ')}`);
-      }
+      game.dispatch({ type: ActionType.DISCARD_CARDS, player: HUMAN, cardIds });
     };
     actions.append(btn);
   } else {
     $('status').textContent = 'Game over';
   }
+  renderPlayers();
+}
 
-  const activeHand = state.phase === Phase.PLAY ? state.currentPlayer
-    : state.phase === Phase.DISCARD ? discardingPlayer() : -1;
+function renderPlayers() {
+  const showAll = $('showAll').checked;
+  const activeHand = state.phase === Phase.PLAY ? state.currentPlayer : -1;
+  const canAct = (i) => i === HUMAN && (state.phase === Phase.PLAY ? state.currentPlayer === HUMAN
+    : state.phase === Phase.DISCARD && !state.players[HUMAN].hasDiscarded);
 
   $('players').replaceChildren(...state.players.map((p, i) => {
     const div = document.createElement('div');
@@ -205,10 +213,10 @@ function render() {
     name.textContent = `${p.name}${i === activeHand ? ' ◀' : ''}`;
     const hand = document.createElement('div');
     hand.className = 'cards';
-    if (i === activeHand || showAll || state.phase === Phase.FINISHED) {
+    if (i === HUMAN || showAll || state.phase === Phase.FINISHED) {
       hand.append(...p.hand.map((c) => {
-        const el = cardEl(c, { tag: i === activeHand ? 'button' : 'div', classes: [selected.has(c.id) && i === activeHand && 'selected'] });
-        if (i === activeHand) el.onclick = () => onHandCard(i, c);
+        const el = cardEl(c, { tag: canAct(i) ? 'button' : 'div', classes: [selected.has(c.id) && canAct(i) && 'selected'] });
+        if (canAct(i)) el.onclick = () => onHandCard(i, c);
         return el;
       }));
     } else {
