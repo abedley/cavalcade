@@ -42,6 +42,10 @@ game.dispatch({ type: ActionType.DISCARD_CARDS, player: 0, cardIds: ['blue-7', '
 - Each player discards 2 of their remaining 4 cards and adds the other 2 to their collection.
 - Scoring: in each color, the player(s) with the most cards score 1 per card in that color (in a 2-player game this requires at least 2 more cards than the opponent). Every other card scores its face value. Lowest score wins; ties go to the player with the fewest cards.
 
+## Debug board
+
+`index.html` is a bare-bones hot-seat page for trying the engine in a browser. It is served by GitHub Pages at https://abedley.github.io/cavalcade/. Tapping a card previews which parade cards it would take; tapping it again plays it. Locally, run `python3 -m http.server` and open http://localhost:8000/. ES modules don't load from `file://`.
+
 ## Development
 
 ```sh
