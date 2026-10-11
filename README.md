@@ -55,9 +55,15 @@ Pass `cardsPerColor` (default 11, values 0 to n-1) for a smaller deck and a shor
 - Each player discards 2 of their remaining 4 cards and adds the other 2 to their collection.
 - Scoring: in each color, the player(s) with the most cards score 1 per card in that color (in a 2-player game this requires at least 2 more cards than the opponent). Every other card scores its face value. Lowest score wins; ties go to the player with the fewest cards.
 
-## Debug board
+## Playing in the browser
 
-`index.html` is a bare-bones page for trying the engine in a browser: you play a 2-player game against the computer, with a choice of 3–11 cards per suit. The results table breaks down each suit's cards and points, and marks which majorities counted. It is served by GitHub Pages at https://abedley.github.io/cavalcade/. Tapping a card previews which parade cards it would take; tapping it again plays it. Locally, run `python3 -m http.server` and open http://localhost:8000/. ES modules don't load from `file://`.
+`index.html` is a mobile-first game page: you play a 2-player game against the computer, with a choice of 3–11 cards per suit. It fills the screen without scrolling, on phones (portrait or landscape) and on desktop. It is served by GitHub Pages at https://abedley.github.io/cavalcade/.
+
+- Tap a card in your hand to preview the play. Cards you would take are lifted and outlined in red, a bar marks the safe zone, and the status line shows how many points the play adds. Tap the card again, or press **Play**, to play it.
+- Each player's collection is shown as six suit tiles with the card count and the points that suit is worth right now. ★ marks a suit that currently has the majority, so it scores 1 per card.
+- The menu has a new-game sheet (cards per suit, optional seed), a "Show CPU hand" toggle, the rules, and the game log. The results sheet breaks down each suit's cards and points.
+
+The page is plain HTML, CSS and JS in `index.html` and `ui/`, with no build step. Locally, run `python3 -m http.server` and open http://localhost:8000/. ES modules don't load from `file://`.
 
 ## Development
 

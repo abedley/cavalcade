@@ -2,267 +2,106 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cavalcade (debug)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#efe9dc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Cavalcade</title>
 <link rel="icon" href="data:,">
-<style>
-  :root {
-    --bg: #f6f5f2; --fg: #1d1d1f; --muted: #6b6b70; --panel: #fff; --border: #ddd;
-    --accent: #2f6fde; --remove: #e23d3d;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #151517; --fg: #ececee; --muted: #9a9aa2; --panel: #202024; --border: #34343a; }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; padding: 12px; background: var(--bg); color: var(--fg);
-    font: 15px/1.4 system-ui, -apple-system, sans-serif; max-width: 760px; margin-inline: auto; }
-  h1 { font-size: 18px; margin: 0 0 8px; }
-  h2 { font-size: 14px; margin: 0 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
-  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .cards { display: flex; flex-wrap: wrap; gap: 5px; min-height: 46px; }
-  .card { width: 36px; height: 46px; border-radius: 6px; border: 2px solid transparent; font-weight: 700;
-    display: grid; place-items: center; font-size: 16px; color: #fff; padding: 0; position: relative;
-    text-shadow: 0 1px 1px rgba(0,0,0,.4); }
-  button.card { cursor: pointer; }
-  .card.small { width: 26px; height: 32px; font-size: 12px; border-radius: 4px; }
-  .red { background: #d33a3a; } .blue { background: #2f6fde; } .green { background: #2e9b4f; }
-  .yellow { background: #e0b400; } .purple { background: #8a4fd0; } .black { background: #222; border-color: #666; }
-  .card.selected { outline: 3px solid var(--accent); outline-offset: 2px; transform: translateY(-4px); }
-  .card.removing { outline: 3px solid var(--remove); outline-offset: 2px; opacity: .55; }
-  .card.safe::after { content: ''; position: absolute; bottom: -6px; left: 30%; right: 30%; height: 3px;
-    background: var(--muted); border-radius: 2px; }
-  .player { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }
-  .player:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
-  .player.current > .name { color: var(--accent); }
-  .name { font-weight: 600; margin-bottom: 4px; }
-  .muted { color: var(--muted); font-size: 13px; }
-  button.btn { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--accent); color: #fff; cursor: pointer; }
-  button.btn:disabled { opacity: .4; cursor: default; }
-  button.btn.secondary { background: transparent; color: var(--fg); }
-  input, select { font: inherit; padding: 6px; border-radius: 6px; border: 1px solid var(--border);
-    background: var(--panel); color: var(--fg); }
-  input[type=number] { width: 90px; }
-  #log { max-height: 220px; overflow-y: auto; font-size: 13px; margin: 0; padding-left: 30px; }
-  #log li.err { color: var(--remove); }
-  table { border-collapse: collapse; width: 100%; font-size: 14px; }
-  td, th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
-  .banner { font-weight: 600; }
-</style>
+<link rel="stylesheet" href="ui/app.css">
 </head>
 <body>
-<h1>Cavalcade debug board</h1>
-<p class="muted">Test page for the game engine. You play one game against the computer. On your turn, tap a card
-  to preview the play (red outline = cards you would take, underline = safe zone), then tap it again to play.</p>
+<main id="app">
+  <header class="bar">
+    <div class="brand"><span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>Cavalcade</div>
+    <span class="chip" id="deckChip" title="Cards left in the deck">Deck <b id="deck">–</b></span>
+    <button class="icon-btn" id="menuBtn" aria-label="Menu">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </header>
 
-<section>
-  <div class="row">
-    <label>Cards per suit <select id="perSuit"></select></label>
-    <label>Seed <input id="seed" type="number" placeholder="random"></label>
-    <button class="btn" id="start">New game</button>
-    <label class="row"><input type="checkbox" id="showAll"> Show CPU hand</label>
-  </div>
-</section>
-
-<div id="game" hidden>
-  <section>
-    <div class="row" style="justify-content: space-between">
-      <h2>Parade <span id="paradeCount"></span></h2>
-      <span class="muted">Deck: <b id="deck"></b></span>
+  <section class="side" id="cpu">
+    <div class="side-head">
+      <span class="who">CPU</span>
+      <span class="cpu-hand" id="cpuHand"></span>
+      <span class="pts"><b id="cpuScore">0</b> pts</span>
     </div>
-    <div class="cards" id="parade"></div>
-    <p class="banner" id="status"></p>
-    <div class="row" id="actions"></div>
+    <div class="tiles" id="cpuTiles"></div>
   </section>
-  <section id="players"></section>
-  <section id="resultsBox" hidden><h2>Results</h2><div id="results"></div></section>
-  <section><h2>Log</h2><ol id="log"></ol></section>
-</div>
 
-<script type="module">
-import { attachComputerPlayers, Game, GameEvent, ActionType, Phase, COLORS, DISCARD_COUNT, MAX_CARDS_PER_COLOR,
-  minCardsPerColor, resolvePlay, seededRandom } from './src/index.js';
+  <section class="parade-zone">
+    <div class="parade-labels"><span>Front</span><span class="final" id="finalChip" hidden></span><span>Newest</span></div>
+    <div class="parade" id="parade"></div>
+  </section>
 
-const $ = (id) => document.getElementById(id);
-const PLAYERS = ['You', 'CPU'];
-for (let n = MAX_CARDS_PER_COLOR; n >= minCardsPerColor(PLAYERS.length); n--) {
-  $('perSuit').add(new Option(`${n} (0–${n - 1})`, n));
-}
+  <section class="status">
+    <div class="msg">
+      <div class="last" id="lastMove"></div>
+      <div class="prompt" id="prompt"></div>
+    </div>
+    <button class="btn" id="actionBtn" hidden></button>
+  </section>
 
-const HUMAN = 0;
-const CPU_DELAY_MS = 700;
-let game, state, seed, stopComputers;
-let selected = new Set(); // card ids selected in the current interaction
+  <section class="side" id="you">
+    <div class="tiles" id="youTiles"></div>
+    <div class="side-head">
+      <span class="who">You</span>
+      <span class="hint" id="youHint"></span>
+      <span class="pts"><b id="youScore">0</b> pts</span>
+    </div>
+  </section>
 
-function cardEl(card, { small = false, tag = 'div', classes = [] } = {}) {
-  const el = document.createElement(tag);
-  el.className = ['card', card.color, small && 'small', ...classes].filter(Boolean).join(' ');
-  el.textContent = card.value;
-  el.title = card.id;
-  return el;
-}
+  <section class="hand" id="hand" aria-label="Your hand"></section>
+</main>
 
-function log(text, cls) {
-  const li = document.createElement('li');
-  li.textContent = text;
-  if (cls) li.className = cls;
-  $('log').prepend(li);
-}
+<dialog id="setup">
+  <form method="dialog" class="sheet">
+    <h1 class="title"><span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>Cavalcade</h1>
+    <p class="sub">A game of Parade against the computer.</p>
+    <label class="field">
+      <span class="field-head">Cards per suit <output id="perSuitOut"></output></span>
+      <input type="range" id="perSuit" step="1">
+      <span class="field-note" id="perSuitNote"></span>
+    </label>
+    <label class="field">
+      <span class="field-head">Seed <span class="field-note">optional, replays the same deal</span></span>
+      <input type="number" id="seed" inputmode="numeric" placeholder="Random">
+    </label>
+    <details class="rules"><summary>How to play</summary><div class="rules-body" data-rules></div></details>
+    <div class="sheet-actions">
+      <button class="btn big" value="start" id="startBtn" autofocus>Start game</button>
+      <button class="btn secondary" value="cancel" id="setupCancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
 
-const fmt = (c) => `${c.color} ${c.value}`;
-const nameOf = (i) => state.players[i].name;
+<dialog id="menu">
+  <form method="dialog" class="sheet">
+    <div class="sheet-head"><h2>Menu</h2><button class="icon-btn" value="close" aria-label="Close">✕</button></div>
+    <div class="menu-list">
+      <button class="menu-item" value="new">New game…</button>
+      <button class="menu-item" value="results" id="menuResults" hidden>Show results</button>
+      <label class="menu-item toggle"><span>Show CPU hand</span><input type="checkbox" id="showCpu"></label>
+    </div>
+    <details class="rules"><summary>How to play</summary><div class="rules-body" data-rules></div></details>
+    <details class="rules" open><summary>Game log</summary><ol id="log"></ol></details>
+    <p class="field-note" id="seedNote"></p>
+  </form>
+</dialog>
 
-function newGame() {
-  stopComputers?.();
-  seed = $('seed').value === '' ? Math.floor(Math.random() * 1e6) : Number($('seed').value);
-  game = new Game({
-    players: PLAYERS,
-    cardsPerColor: Number($('perSuit').value),
-    random: seededRandom(seed),
-  });
-  $('log').replaceChildren();
-  selected.clear();
-  game.on(GameEvent.STATE, (s) => { state = s; render(); });
-  game.on(GameEvent.CARD_PLAYED, ({ player, card, removed, drew }) =>
-    log(`${nameOf(player)} played ${fmt(card)}, took ${removed.length ? removed.map(fmt).join(', ') : 'nothing'}`
-      + (drew ? '' : ' (no draw)')));
-  game.on(GameEvent.FINAL_ROUND, ({ triggeredBy, reason }) =>
-    log(`Final round! Triggered by ${nameOf(triggeredBy)}: ${reason === 'deckEmpty' ? 'deck empty' : 'collected all colors'}`));
-  game.on(GameEvent.INVALID_ACTION, ({ message }) => log(`Invalid: ${message}`, 'err'));
-  game.on(GameEvent.GAME_OVER, ({ winners }) => log(`Game over. Winner: ${winners.map(nameOf).join(', ')}`));
-  $('game').hidden = false;
-  stopComputers = attachComputerPlayers(game, [1 - HUMAN], { delay: CPU_DELAY_MS });
-  game.start();
-  log(`New game, seed ${seed}, ${state.cardsPerColor} cards per suit. ${nameOf(state.currentPlayer)} start${state.currentPlayer === HUMAN ? '' : 's'}.`);
-}
+<dialog id="results">
+  <form method="dialog" class="sheet">
+    <div class="sheet-head"><h2 id="resultTitle"></h2><button class="icon-btn" value="close" aria-label="Close">✕</button></div>
+    <div class="score-line" id="scoreLine"></div>
+    <div id="breakdown"></div>
+    <div class="sheet-actions">
+      <button class="btn secondary" value="settings">Settings</button>
+      <button class="btn big" value="again">Play again</button>
+    </div>
+  </form>
+</dialog>
 
-function previewRemoval() {
-  if (state.phase !== Phase.PLAY || selected.size !== 1) return null;
-  const [id] = selected;
-  const card = state.players[state.currentPlayer].hand.find((c) => c.id === id);
-  if (!card) return null;
-  const { removed } = resolvePlay(state.parade, card);
-  return { removedIds: new Set(removed.map((c) => c.id)), safeFrom: Math.max(0, state.parade.length - card.value) };
-}
-
-function onHandCard(playerIndex, card) {
-  if (state.phase === Phase.PLAY) {
-    if (playerIndex !== HUMAN || state.currentPlayer !== HUMAN) return;
-    if (selected.has(card.id)) {
-      selected.clear();
-      game.dispatch({ type: ActionType.PLAY_CARD, player: playerIndex, cardId: card.id });
-      return;
-    }
-    selected = new Set([card.id]);
-  } else if (state.phase === Phase.DISCARD) {
-    if (playerIndex !== HUMAN || state.players[HUMAN].hasDiscarded) return;
-    if (selected.has(card.id)) selected.delete(card.id);
-    else if (selected.size < DISCARD_COUNT) selected.add(card.id);
-  }
-  render();
-}
-
-
-function render() {
-  const preview = previewRemoval();
-
-  $('deck').textContent = state.deckCount;
-  $('paradeCount').textContent = `(${state.parade.length})`;
-  $('parade').replaceChildren(...state.parade.map((c, i) => cardEl(c, {
-    classes: [preview?.removedIds.has(c.id) && 'removing', preview && i >= preview.safeFrom && 'safe'],
-  })));
-
-  const actions = $('actions');
-  actions.replaceChildren();
-  if (state.phase === Phase.PLAY) {
-    const fr = state.finalRound;
-    $('status').textContent = `${nameOf(state.currentPlayer)} to play`
-      + (state.currentPlayer === HUMAN ? '' : ' (thinking…)')
-      + (fr ? ` — final round, ${fr.turnsRemaining} turn(s) left` : '')
-      + (preview ? ` — would take ${preview.removedIds.size} card(s). Tap again to play.` : '');
-  } else if (state.phase === Phase.DISCARD && state.players[HUMAN].hasDiscarded) {
-    $('status').textContent = 'Waiting for the computers to discard…';
-  } else if (state.phase === Phase.DISCARD) {
-    $('status').textContent = `Choose ${DISCARD_COUNT} cards to discard (${selected.size}/${DISCARD_COUNT}). The rest go to your collection.`;
-    const btn = document.createElement('button');
-    btn.className = 'btn';
-    btn.textContent = 'Discard';
-    btn.disabled = selected.size !== DISCARD_COUNT;
-    btn.onclick = () => {
-      const cardIds = [...selected];
-      selected.clear();
-      game.dispatch({ type: ActionType.DISCARD_CARDS, player: HUMAN, cardIds });
-    };
-    actions.append(btn);
-  } else {
-    $('status').textContent = 'Game over';
-  }
-  renderPlayers();
-}
-
-function renderPlayers() {
-  const showAll = $('showAll').checked;
-  const activeHand = state.phase === Phase.PLAY ? state.currentPlayer : -1;
-  const canAct = (i) => i === HUMAN && (state.phase === Phase.PLAY ? state.currentPlayer === HUMAN
-    : state.phase === Phase.DISCARD && !state.players[HUMAN].hasDiscarded);
-
-  $('players').replaceChildren(...state.players.map((p, i) => {
-    const div = document.createElement('div');
-    div.className = 'player' + (i === activeHand ? ' current' : '');
-    const name = document.createElement('div');
-    name.className = 'name';
-    name.textContent = `${p.name}${i === activeHand ? ' ◀' : ''}`;
-    const hand = document.createElement('div');
-    hand.className = 'cards';
-    if (i === HUMAN || showAll || state.phase === Phase.FINISHED) {
-      hand.append(...p.hand.map((c) => {
-        const el = cardEl(c, { tag: canAct(i) ? 'button' : 'div', classes: [selected.has(c.id) && canAct(i) && 'selected'] });
-        if (canAct(i)) el.onclick = () => onHandCard(i, c);
-        return el;
-      }));
-    } else {
-      hand.innerHTML = `<span class="muted">${p.hand.length} cards hidden</span>`;
-    }
-    const coll = document.createElement('div');
-    coll.className = 'cards';
-    coll.style.minHeight = '0';
-    const sorted = [...p.collected].sort((a, b) => a.color.localeCompare(b.color) || a.value - b.value);
-    coll.append(...sorted.map((c) => cardEl(c, { small: true })));
-    const label = document.createElement('div');
-    label.className = 'muted';
-    label.textContent = `Collected (${p.collected.length})`;
-    div.append(name, hand, label, coll);
-    return div;
-  }));
-
-  $('resultsBox').hidden = !state.results;
-  if (state.results) {
-    const { scores, majorities, winners } = state.results;
-    // Per-suit breakdown so the "2 more than your opponent" majority rule can be checked.
-    const rows = COLORS.map((color) => {
-      const cells = state.players.map((p, i) => {
-        const cards = p.collected.filter((c) => c.color === color);
-        const flipped = majorities[color].includes(i);
-        const pts = flipped ? cards.length : cards.reduce((n, c) => n + c.value, 0);
-        return `<td>${cards.length}${flipped ? ' ✓' : ''}</td><td>${pts}</td>`;
-      }).join('');
-      return `<tr><td><span class="card small ${color}" style="display:inline-grid">&nbsp;</span> ${color}</td>${cells}</tr>`;
-    }).join('');
-    const totals = scores.map((s) => `<th>${s.cardCount}</th><th>${s.score}${winners.includes(s.player) ? ' 🏆' : ''}</th>`).join('');
-    $('results').innerHTML = `<table>
-      <tr><th></th>${state.players.map((p) => `<th colspan="2">${p.name}</th>`).join('')}</tr>
-      <tr><th>Suit</th>${state.players.map(() => '<th>cards</th><th>pts</th>').join('')}</tr>
-      ${rows}
-      <tr><th>Total</th>${totals}</tr></table>`
-      + `<p class="muted">✓ = majority: those cards score 1 each. With 2 players you need at least 2 more cards
-         in a suit than your opponent. Lowest score wins; ties go to fewer cards.</p>`
-      + `<p class="muted">Seed ${seed}</p>`;
-  }
-}
-
-$('start').onclick = newGame;
-$('showAll').onchange = () => state && render();
-</script>
+<script type="module" src="ui/app.js"></script>
 </body>
 </html>
