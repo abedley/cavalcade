@@ -44,7 +44,7 @@
   input, select { font: inherit; padding: 6px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--panel); color: var(--fg); }
   input[type=number] { width: 90px; }
-  #log { max-height: 220px; overflow-y: auto; font-size: 13px; margin: 0; padding-left: 18px; }
+  #log { max-height: 220px; overflow-y: auto; font-size: 13px; margin: 0; padding-left: 30px; }
   #log li.err { color: var(--remove); }
   table { border-collapse: collapse; width: 100%; font-size: 14px; }
   td, th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
@@ -53,15 +53,15 @@
 </head>
 <body>
 <h1>Cavalcade debug board</h1>
-<p class="muted">Test page for the game engine. You are P1; everyone else is a computer. On your turn, tap a card
+<p class="muted">Test page for the game engine. You play one game against the computer. On your turn, tap a card
   to preview the play (red outline = cards you would take, underline = safe zone), then tap it again to play.</p>
 
 <section>
   <div class="row">
-    <label>Players <select id="count"></select></label>
+    <label>Cards per suit <select id="perSuit"></select></label>
     <label>Seed <input id="seed" type="number" placeholder="random"></label>
     <button class="btn" id="start">New game</button>
-    <label class="row"><input type="checkbox" id="showAll"> Show computer hands</label>
+    <label class="row"><input type="checkbox" id="showAll"> Show CPU hand</label>
   </div>
 </section>
 
@@ -81,11 +81,14 @@
 </div>
 
 <script type="module">
-import { attachComputerPlayers, Game, GameEvent, ActionType, Phase, DISCARD_COUNT, MIN_PLAYERS, MAX_PLAYERS,
-  resolvePlay, seededRandom } from './src/index.js';
+import { attachComputerPlayers, Game, GameEvent, ActionType, Phase, COLORS, DISCARD_COUNT, MAX_CARDS_PER_COLOR,
+  minCardsPerColor, resolvePlay, seededRandom } from './src/index.js';
 
 const $ = (id) => document.getElementById(id);
-for (let n = MIN_PLAYERS; n <= MAX_PLAYERS; n++) $('count').add(new Option(n, n));
+const PLAYERS = ['You', 'CPU'];
+for (let n = MAX_CARDS_PER_COLOR; n >= minCardsPerColor(PLAYERS.length); n--) {
+  $('perSuit').add(new Option(`${n} (0–${n - 1})`, n));
+}
 
 const HUMAN = 0;
 const CPU_DELAY_MS = 700;
@@ -111,11 +114,11 @@ const fmt = (c) => `${c.color} ${c.value}`;
 const nameOf = (i) => state.players[i].name;
 
 function newGame() {
-  const count = Number($('count').value);
   stopComputers?.();
   seed = $('seed').value === '' ? Math.floor(Math.random() * 1e6) : Number($('seed').value);
   game = new Game({
-    players: Array.from({ length: count }, (_, i) => (i === HUMAN ? 'P1 (you)' : `P${i + 1} (cpu)`)),
+    players: PLAYERS,
+    cardsPerColor: Number($('perSuit').value),
     random: seededRandom(seed),
   });
   $('log').replaceChildren();
@@ -129,10 +132,9 @@ function newGame() {
   game.on(GameEvent.INVALID_ACTION, ({ message }) => log(`Invalid: ${message}`, 'err'));
   game.on(GameEvent.GAME_OVER, ({ winners }) => log(`Game over. Winner: ${winners.map(nameOf).join(', ')}`));
   $('game').hidden = false;
-  stopComputers = attachComputerPlayers(game, [...Array(count).keys()].filter((i) => i !== HUMAN),
-    { delay: CPU_DELAY_MS });
+  stopComputers = attachComputerPlayers(game, [1 - HUMAN], { delay: CPU_DELAY_MS });
   game.start();
-  log(`New game, seed ${seed}. ${nameOf(state.currentPlayer)} starts.`);
+  log(`New game, seed ${seed}, ${state.cardsPerColor} cards per suit. ${nameOf(state.currentPlayer)} start${state.currentPlayer === HUMAN ? '' : 's'}.`);
 }
 
 function previewRemoval() {
@@ -237,10 +239,24 @@ function renderPlayers() {
   $('resultsBox').hidden = !state.results;
   if (state.results) {
     const { scores, majorities, winners } = state.results;
-    const majFor = (i) => Object.entries(majorities).filter(([, ps]) => ps.includes(i)).map(([c]) => c).join(', ') || '—';
-    $('results').innerHTML = `<table><tr><th>Player</th><th>Score</th><th>Cards</th><th>Majorities</th></tr>${
-      scores.map((s) => `<tr><td>${nameOf(s.player)}${winners.includes(s.player) ? ' 🏆' : ''}</td><td>${s.score}</td>`
-        + `<td>${s.cardCount}</td><td>${majFor(s.player)}</td></tr>`).join('')}</table>`
+    // Per-suit breakdown so the "2 more than your opponent" majority rule can be checked.
+    const rows = COLORS.map((color) => {
+      const cells = state.players.map((p, i) => {
+        const cards = p.collected.filter((c) => c.color === color);
+        const flipped = majorities[color].includes(i);
+        const pts = flipped ? cards.length : cards.reduce((n, c) => n + c.value, 0);
+        return `<td>${cards.length}${flipped ? ' ✓' : ''}</td><td>${pts}</td>`;
+      }).join('');
+      return `<tr><td><span class="card small ${color}" style="display:inline-grid">&nbsp;</span> ${color}</td>${cells}</tr>`;
+    }).join('');
+    const totals = scores.map((s) => `<th>${s.cardCount}</th><th>${s.score}${winners.includes(s.player) ? ' 🏆' : ''}</th>`).join('');
+    $('results').innerHTML = `<table>
+      <tr><th></th>${state.players.map((p) => `<th colspan="2">${p.name}</th>`).join('')}</tr>
+      <tr><th>Suit</th>${state.players.map(() => '<th>cards</th><th>pts</th>').join('')}</tr>
+      ${rows}
+      <tr><th>Total</th>${totals}</tr></table>`
+      + `<p class="muted">✓ = majority: those cards score 1 each. With 2 players you need at least 2 more cards
+         in a suit than your opponent. Lowest score wins; ties go to fewer cards.</p>`
       + `<p class="muted">Seed ${seed}</p>`;
   }
 }

@@ -1,5 +1,5 @@
 export { attachComputerPlayers, chooseCard, chooseDiscards, computerAction } from './ai.js';
-export { COLORS, createDeck, seededRandom, shuffle } from './cards.js';
+export { COLORS, createDeck, MAX_CARDS_PER_COLOR, seededRandom, shuffle } from './cards.js';
 export { Emitter } from './emitter.js';
 export {
   ActionType,
@@ -10,6 +10,7 @@ export {
   InvalidActionError,
   MAX_PLAYERS,
   MIN_PLAYERS,
+  minCardsPerColor,
   PARADE_SIZE,
   Phase,
 } from './game.js';

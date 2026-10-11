@@ -126,3 +126,34 @@ for (const players of [['A', 'B'], ['A', 'B', 'C', 'D'], ['A', 'B', 'C', 'D', 'E
     });
   }
 }
+
+test('cardsPerColor shrinks the deck', () => {
+  const game = new Game({ players: ['A', 'B'], cardsPerColor: 6, random: seededRandom(3) });
+  game.start();
+  const state = game.getState();
+  assert.equal(state.cardsPerColor, 6);
+  assert.equal(state.deckCount, 36 - 10 - 6);
+  const all = [...state.parade, ...state.players.flatMap((p) => p.hand)];
+  assert.ok(all.every((c) => c.value >= 0 && c.value <= 5));
+});
+
+test('cardsPerColor is validated', () => {
+  assert.throws(() => new Game({ players: ['A', 'B'], cardsPerColor: 12 }), RangeError);
+  assert.throws(() => new Game({ players: ['A', 'B'], cardsPerColor: 2 }), RangeError);
+  assert.throws(() => new Game({ players: Array(6).fill('p'), cardsPerColor: 6 }), RangeError);
+  assert.doesNotThrow(() => new Game({ players: ['A', 'B'], cardsPerColor: 3 }));
+});
+
+for (const cardsPerColor of [3, 5, 8]) {
+  test(`2-player game with ${cardsPerColor} cards per color plays to completion`, () => {
+    const game = new Game({ players: ['A', 'B'], cardsPerColor, random: seededRandom(cardsPerColor) });
+    game.start();
+    while (game.getState().phase === Phase.PLAY) assert.equal(playFirstCard(game), true);
+    game.getState().players.forEach((p, i) =>
+      game.dispatch({ type: ActionType.DISCARD_CARDS, player: i, cardIds: [p.hand[0].id, p.hand[1].id] }));
+    const end = game.getState();
+    assert.equal(end.phase, Phase.FINISHED);
+    const total = end.parade.length + end.deckCount + end.players.reduce((n, p) => n + p.collected.length + 2, 0);
+    assert.equal(total, cardsPerColor * 6);
+  });
+}

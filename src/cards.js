@@ -1,12 +1,14 @@
 export const COLORS = Object.freeze(['red', 'blue', 'green', 'yellow', 'purple', 'black']);
-export const MIN_VALUE = 0;
-export const MAX_VALUE = 10;
+export const MAX_CARDS_PER_COLOR = 11;
 
-/** Builds the 66-card Parade deck: one card of each value 0-10 in each of six colors. */
-export function createDeck() {
+/**
+ * Builds a Parade deck with one card of each value 0..cardsPerColor-1 in each
+ * of six colors. The standard deck is 11 per color (values 0-10, 66 cards).
+ */
+export function createDeck(cardsPerColor = MAX_CARDS_PER_COLOR) {
   const deck = [];
   for (const color of COLORS) {
-    for (let value = MIN_VALUE; value <= MAX_VALUE; value++) {
+    for (let value = 0; value < cardsPerColor; value++) {
       deck.push(Object.freeze({ id: `${color}-${value}`, color, value }));
     }
   }

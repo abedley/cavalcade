@@ -66,3 +66,10 @@ test('score breaks ties by fewest cards', () => {
   assert.deepEqual(result.scores.map((s) => s.score), [3, 3]);
   assert.deepEqual(result.winners, [1]);
 });
+
+test('two-player majority boundary cases', () => {
+  const n = (color, count) => Array.from({ length: count }, (_, i) => c(color, i));
+  for (const [a, b, expected] of [[1, 0, []], [2, 1, []], [5, 4, []], [2, 0, [0]], [3, 1, [0]], [0, 2, [1]]]) {
+    assert.deepEqual(majorities([n('red', a), n('red', b)]).red, expected, `${a} vs ${b}`);
+  }
+});

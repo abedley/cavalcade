@@ -1,4 +1,4 @@
-import { createDeck, shuffle } from './cards.js';
+import { COLORS, createDeck, MAX_CARDS_PER_COLOR, shuffle } from './cards.js';
 import { Emitter } from './emitter.js';
 import { hasAllColors, resolvePlay, score } from './rules.js';
 
@@ -32,6 +32,11 @@ export const GameEvent = Object.freeze({
   INVALID_ACTION: 'invalidAction',
 });
 
+/** Smallest deck that still leaves at least one card to draw after dealing. */
+export function minCardsPerColor(playerCount) {
+  return Math.ceil((playerCount * HAND_SIZE + PARADE_SIZE + 1) / COLORS.length);
+}
+
 export class InvalidActionError extends Error {
   name = 'InvalidActionError';
 }
@@ -57,12 +62,27 @@ export class Game extends Emitter {
   #lastTurn = null;
   #results = null;
   #random;
+  #cardsPerColor;
 
-  constructor({ players, random = Math.random } = {}) {
+  /**
+   * @param {object} options
+   * @param {string[]} options.players Player names, 2-6 of them.
+   * @param {number} [options.cardsPerColor=11] Cards in each color (values 0..n-1). Smaller
+   *   decks give shorter games; the deck must still leave cards to draw after the deal.
+   * @param {() => number} [options.random=Math.random]
+   */
+  constructor({ players, cardsPerColor = MAX_CARDS_PER_COLOR, random = Math.random } = {}) {
     super();
     if (!Array.isArray(players) || players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
       throw new RangeError(`Parade needs ${MIN_PLAYERS}-${MAX_PLAYERS} players`);
     }
+    const minCards = minCardsPerColor(players.length);
+    if (!Number.isInteger(cardsPerColor) || cardsPerColor < minCards || cardsPerColor > MAX_CARDS_PER_COLOR) {
+      throw new RangeError(
+        `cardsPerColor must be ${minCards}-${MAX_CARDS_PER_COLOR} for ${players.length} players`,
+      );
+    }
+    this.#cardsPerColor = cardsPerColor;
     this.#random = random;
     this.#players = players.map((name) => ({ name: String(name), hand: [], collected: [] }));
   }
@@ -70,7 +90,7 @@ export class Game extends Emitter {
   /** Shuffles, deals hands and the starting parade, then emits the initial state. */
   start() {
     if (this.#phase !== null) throw new Error('Game has already started');
-    this.#deck = shuffle(createDeck(), this.#random);
+    this.#deck = shuffle(createDeck(this.#cardsPerColor), this.#random);
     for (const player of this.#players) player.hand = this.#deck.splice(0, HAND_SIZE);
     this.#parade = this.#deck.splice(0, PARADE_SIZE);
     this.#currentPlayer = Math.floor(this.#random() * this.#players.length);
@@ -108,6 +128,7 @@ export class Game extends Emitter {
   getState() {
     return structuredClone({
       phase: this.#phase,
+      cardsPerColor: this.#cardsPerColor,
       currentPlayer: this.#phase === Phase.PLAY ? this.#currentPlayer : null,
       players: this.#players.map((p, i) => ({
         ...p,
