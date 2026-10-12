@@ -17,6 +17,7 @@ const HUMAN = 0;
 const CPU = 1;
 const PLAYERS = ['You', 'CPU'];
 const CPU_DELAY_MS = 900;
+const DEFAULT_PER_SUIT = 7;
 const SUIT = { red: '♥', blue: '♠', green: '♣', yellow: '★', purple: '◆', black: '●' };
 const RULES = `<ul>
   <li>On your turn, play a card from your hand to the end of the parade, then draw.</li>
@@ -47,15 +48,15 @@ let resultsTimer = null;
 
 function loadPrefs() {
   try {
-    return { perSuit: MAX_CARDS_PER_COLOR, showCpu: false, ...JSON.parse(localStorage.getItem('cavalcade') ?? '{}') };
+    return { perSuit: DEFAULT_PER_SUIT, showCpu: false, ...JSON.parse(localStorage.getItem('cavalcade-prefs') ?? '{}') };
   } catch {
-    return { perSuit: MAX_CARDS_PER_COLOR, showCpu: false };
+    return { perSuit: DEFAULT_PER_SUIT, showCpu: false };
   }
 }
 
 function savePrefs() {
   try {
-    localStorage.setItem('cavalcade', JSON.stringify(prefs));
+    localStorage.setItem('cavalcade-prefs', JSON.stringify(prefs));
   } catch {
     // ignore
   }
@@ -485,17 +486,13 @@ $('setup').addEventListener('cancel', (e) => {
 });
 
 $('menu').addEventListener('close', () => {
-  if ($('menu').returnValue === 'new') new ResizeObserver(() => state && renderParade(playPreview())).observe($('parade'));
-
-openSetup();
+  if ($('menu').returnValue === 'new') openSetup();
   if ($('menu').returnValue === 'results') showResults();
 });
 
 $('results').addEventListener('close', () => {
   if ($('results').returnValue === 'again') newGame({ perSuit: state.cardsPerColor });
-  if ($('results').returnValue === 'settings') new ResizeObserver(() => state && renderParade(playPreview())).observe($('parade'));
-
-openSetup();
+  if ($('results').returnValue === 'settings') openSetup();
 });
 
 // Tapping the dimmed backdrop closes a sheet.

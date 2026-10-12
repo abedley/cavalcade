@@ -227,7 +227,8 @@ button { font: inherit; color: inherit; }
 }
 .parade-labels {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 8px;
   align-items: center;
   font-size: 11px;
   text-transform: uppercase;
@@ -237,6 +238,7 @@ button { font: inherit; color: inherit; }
   min-height: 20px;
 }
 .final {
+  margin-right: auto;
   text-transform: none;
   letter-spacing: 0;
   font-weight: 700;

@@ -57,7 +57,7 @@ Pass `cardsPerColor` (default 11, values 0 to n-1) for a smaller deck and a shor
 
 ## Playing in the browser
 
-`index.html` is a mobile-first game page: you play a 2-player game against the computer, with a choice of 3–11 cards per suit. It fills the screen without scrolling, on phones (portrait or landscape) and on desktop. It is served by GitHub Pages at https://abedley.github.io/cavalcade/.
+`index.html` is a mobile-first game page: you play a 2-player game against the computer, with a choice of 3–11 cards per suit (7 by default; the standard deck is 11). It fills the screen without scrolling, on phones (portrait or landscape) and on desktop. It is served by GitHub Pages at https://abedley.github.io/cavalcade/.
 
 - Tap a card in your hand to preview the play. Cards you would take are lifted and outlined in red, a bar marks the safe zone, and the status line shows how many points the play adds. Tap the card again, or press **Play**, to play it.
 - Each player's collection is shown as six suit tiles with the card count and the points that suit is worth right now. ✓ marks a suit that currently has the majority, so it scores 1 per card.
