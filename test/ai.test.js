@@ -61,13 +61,35 @@ test('looking three plays ahead beats the greedy choice', () => {
   assert.ok(margin > 0, `total margin ${margin}`);
 });
 
-test('the lookahead only uses what the player can see', () => {
-  const game = new Game({ players: ['a', 'b'], cardsPerColor: 7, random: seededRandom(9) });
+test('the computer never reads the opponent\'s hand or discards', () => {
+  for (const seed of [3, 9, 21, 40]) {
+    const game = new Game({ players: ['a', 'b'], cardsPerColor: 7, random: seededRandom(seed) });
+    game.start();
+    for (let t = 0; t < seed % 7; t++) {
+      const s = game.getState();
+      game.dispatch({ type: ActionType.PLAY_CARD, player: s.currentPlayer, cardId: s.players[s.currentPlayer].hand[0].id });
+    }
+    const full = game.getState();
+    const me = full.currentPlayer;
+    const fair = chooseCard(game.getStateFor(me), me);
+    // Handing it the full state, or a made-up opponent hand, changes nothing.
+    assert.equal(chooseCard(full, me), fair);
+    const fake = structuredClone(full);
+    fake.players[1 - me].hand = fake.players[me].hand;
+    assert.equal(chooseCard(fake, me), fair);
+  }
+
+  // Likewise for the discard: the opponent has already chosen, but that stays hidden.
+  const game = new Game({ players: ['a', 'b'], cardsPerColor: 7, random: seededRandom(4) });
   game.start();
+  while (game.getState().phase === Phase.PLAY) {
+    const s = game.getState();
+    game.dispatch({ type: ActionType.PLAY_CARD, player: s.currentPlayer, cardId: s.players[s.currentPlayer].hand[0].id });
+  }
+  game.dispatch({ type: ActionType.DISCARD_CARDS, player: 0, cardIds: chooseDiscards(game.getStateFor(0), 0) });
   const full = game.getState();
-  const i = full.currentPlayer;
-  // Knowing the opponent's hand changes nothing.
-  assert.equal(chooseCard(full, i), chooseCard(game.getStateFor(i), i));
+  assert.ok(full.players[0].kept);
+  assert.deepEqual(chooseDiscards(full, 1), chooseDiscards(game.getStateFor(1), 1));
 });
 
 test('the lookahead counts the cards kept at the end', () => {
