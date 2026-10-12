@@ -1,4 +1,4 @@
-export { attachComputerPlayers, chooseCard, chooseDiscards, computerAction } from './ai.js';
+export { attachComputerPlayers, chooseCard, chooseDiscards, chooseGreedyCard, computerAction, LOOKAHEAD } from './ai.js';
 export { COLORS, createDeck, MAX_CARDS_PER_COLOR, seededRandom, shuffle } from './cards.js';
 export { dateOfKey, dayKey, msUntilMidnight, seedForDay } from './daily.js';
 export { Emitter } from './emitter.js';
