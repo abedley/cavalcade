@@ -24,7 +24,7 @@ const RULES = `<ul>
   <li>From the rest, you take every card that matches your card's colour or has a value
     less than or equal to it. Tap a card once to see what it would take, and again to play it.</li>
   <li>Taken cards score their face value, but if you hold the most of a colour they score
-    1 each (★). With two players you need at least 2 more of that colour than your opponent.</li>
+    1 each (✓). With two players you need at least 2 more of that colour than your opponent.</li>
   <li>When someone has collected all six colours, or the deck runs out, each player takes one
     last turn without drawing. Then you discard 2 of your 4 cards; the other 2 join your collection.</li>
   <li>Lowest score wins. Ties go to whoever collected fewer cards.</li>
@@ -425,7 +425,7 @@ function showResults() {
       const cards = p.collected.filter((c) => c.color === color).sort((a, b) => a.value - b.value);
       const flip = majorities[color].includes(i);
       const pts = flip ? cards.length : cards.reduce((n, c) => n + c.value, 0);
-      return `<td>${cards.length}${flip ? ' <span class="star">★</span>' : ''}`
+      return `<td>${cards.length}${flip ? ' <span class="star">✓</span>' : ''}`
         + `<span class="vals">${cards.map((c) => c.value).join(' ') || '–'}</span></td><td>${pts}</td>`;
     }).join('');
     return `<tr><td><span class="swatch ${color}"></span>${color}</td>${cells}</tr>`;
@@ -439,7 +439,7 @@ function showResults() {
     <tbody>${rows}</tbody>
     <tfoot><tr><th>Total</th>${scores.map((s) => `<th>${s.cardCount}</th><th>${s.score}</th>`).join('')}</tr></tfoot>
   </table>
-  <p class="field-note">★ majority: those cards score 1 each. With two players you need at least 2 more cards of a
+  <p class="field-note">✓ majority: those cards score 1 each. With two players you need at least 2 more cards of a
     colour than your opponent. Lowest score wins; ties go to fewer cards. Seed ${seed}.</p>`;
   if (!$('results').open) {
     $('results').returnValue = '';
