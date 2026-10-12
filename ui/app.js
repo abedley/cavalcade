@@ -18,7 +18,8 @@ const CPU = 1;
 const PLAYERS = ['You', 'CPU'];
 const CPU_DELAY_MS = 900;
 const DEFAULT_PER_SUIT = 7;
-const SUIT = { red: '♥', blue: '♠', green: '♣', yellow: '★', purple: '◆', black: '●' };
+// Playing-card suits for the Queen's card soldiers, a crown, and the Cheshire Cat's crescent grin.
+const SUIT = { red: '♥', blue: '♦', green: '♣', yellow: '♛', purple: '☾', black: '♠' };
 const RULES = `<ul>
   <li>On your turn, play a card from your hand to the end of the parade, then draw.</li>
   <li>Count back from the end of the parade by your card's value: those cards are safe.</li>
@@ -251,7 +252,7 @@ function renderParade(preview) {
     slots.push(slot);
   }
   const parade = $('parade');
-  const { rows, width } = paradeLayout(slots.length, parade.clientWidth - 8, parade.clientHeight);
+  const { rows, width } = paradeLayout(slots.length, parade.clientWidth - 12, parade.clientHeight);
   parade.style.setProperty('--pw', `${width}px`);
   const perRow = Math.ceil(slots.length / rows);
   const lines = [];
@@ -294,7 +295,7 @@ function renderStatus(preview) {
   $('lastMove').textContent = lastMove;
 
   if (state.phase === Phase.PLAY && state.currentPlayer === CPU) {
-    prompt.textContent = 'CPU is thinking…';
+    prompt.textContent = 'The CPU is pondering…';
   } else if (state.phase === Phase.PLAY && preview) {
     const n = preview.removedIds.size;
     prompt.innerHTML = n
@@ -336,7 +337,7 @@ function renderHand() {
   if (!cards.length) {
     const note = document.createElement('div');
     note.className = 'hand-note';
-    note.textContent = state.phase === Phase.FINISHED ? 'Game over' : '';
+    note.textContent = state.phase === Phase.FINISHED ? 'The end.' : '';
     hand.replaceChildren(note);
     return;
   }
@@ -413,7 +414,8 @@ function winnerText({ winners }) {
 function showResults() {
   if (!state?.results) return;
   const { scores, majorities, winners } = state.results;
-  $('resultTitle').textContent = winnerText(state.results);
+  $('resultTitle').textContent = winners.length > 1 ? 'Everybody has won, and all must have prizes!'
+    : winners[0] === HUMAN ? 'O frabjous day! You win.' : 'Off with your head! The CPU wins.';
   $('scoreLine').innerHTML = scores.map((s) => `
     <div class="score-box${winners.includes(s.player) ? ' win' : ''}">
       <div class="l">${nameOf(s.player)}${winners.includes(s.player) ? ' 🏆' : ''}</div>

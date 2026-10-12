@@ -63,6 +63,11 @@ Pass `cardsPerColor` (default 11, values 0 to n-1) for a smaller deck and a shor
 - Each player's collection is shown as six suit tiles with the card count and the points that suit is worth right now. ✓ marks a suit that currently has the majority, so it scores 1 per card.
 - The menu has a new-game sheet (cards per suit, optional seed), a "Show CPU hand" toggle, the rules, and the game log. The results sheet breaks down each suit's cards and points.
 
+The look is a quiet nod to *Alice in Wonderland*:
+- **Pages:** parchment with a faint Looking-Glass chessboard (a night-time plum in dark mode).
+- **Cards:** cream playing cards with coloured frames, like the Queen's card soldiers. The suits are ♥ ♦ ♣ ♠, plus a crown (♛) and the Cheshire Cat's crescent (☾).
+- **Fonts:** IM Fell English, EB Garamond and Playfair Display, from Google Fonts.
+
 The page is plain HTML, CSS and JS in `index.html` and `ui/`, with no build step. Locally, run `python3 -m http.server` and open http://localhost:8000/. ES modules don't load from `file://`.
 
 ## Development
