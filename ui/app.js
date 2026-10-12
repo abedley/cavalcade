@@ -251,7 +251,6 @@ function render() {
   renderParade(preview);
   renderStatus(preview);
   renderHand();
-  $('menuResults').hidden = state.phase !== Phase.FINISHED;
 }
 
 function renderSide(i, live) {
@@ -615,7 +614,6 @@ $('setup').addEventListener('cancel', (e) => {
 
 $('menu').addEventListener('close', () => {
   if ($('menu').returnValue === 'new') openSetup();
-  if ($('menu').returnValue === 'results') showResults();
 });
 
 $('results').addEventListener('close', () => {
