@@ -46,7 +46,7 @@ function duel(seed, options) {
   return game.getState().results.scores.map((r) => r.score);
 }
 
-test('looking three plays ahead beats the greedy choice', () => {
+test('looking ahead beats the greedy choice', () => {
   let wins = 0;
   let losses = 0;
   let margin = 0;
@@ -134,16 +134,21 @@ for (const count of [2, 3, 6]) {
 
 test('computers wait for the human and then continue', async () => {
   const game = new Game({ players: ['me', 'cpu'], random: seededRandom(5) });
+  // Resolves once the game reaches a state where it is the human's turn.
+  const humansTurn = () => new Promise((resolve) => {
+    if (game.getState().currentPlayer === 0) return resolve();
+    const off = game.on(GameEvent.STATE, (s) => s.currentPlayer === 0 && (off(), resolve()));
+  });
   const stop = attachComputerPlayers(game, [1]);
   game.start();
-  await new Promise((r) => setTimeout(r, 20));
+  await humansTurn();
   const state = game.getState();
-  // Whoever started, it must now be the human's turn and nothing else happens until they move.
-  assert.equal(state.currentPlayer, 0);
   const deck = state.deckCount;
   game.dispatch({ type: 'playCard', player: 0, cardId: state.players[0].hand[0].id });
+  await humansTurn();
+  // The computer moved once and is now waiting for the human again.
+  assert.equal(game.getState().deckCount, deck - 2);
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(game.getState().currentPlayer, 0);
   assert.equal(game.getState().deckCount, deck - 2);
   stop();
 });

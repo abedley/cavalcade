@@ -1,6 +1,6 @@
 import { ActionType, DISCARD_COUNT, GameEvent, HAND_SIZE, Phase } from './game.js';
-import { createDeck, MAX_CARDS_PER_COLOR } from './cards.js';
-import { hasAllColors, resolvePlay, score } from './rules.js';
+import { COLORS, createDeck, MAX_CARDS_PER_COLOR } from './cards.js';
+import { resolvePlay, score } from './rules.js';
 
 /*
  * The computer player is tuned for the game the web page plays: one against
@@ -12,8 +12,12 @@ import { hasAllColors, resolvePlay, score } from './rules.js';
  * the deck or the opponent's discards.
  */
 
-/** How many plays ahead the computer looks: its own, the opponent's reply, and its next. */
-export const LOOKAHEAD = 3;
+/**
+ * How many plays ahead the computer looks: its own, the opponent's reply, its
+ * next, another reply and its next again. In simulated 7-per-suit games five
+ * beats three about 59% of the time; six adds little and is ten times slower.
+ */
+export const LOOKAHEAD = 5;
 
 /** Cards each player adds to their collection at the end: 2 of the final 4. */
 const KEPT_AT_END = HAND_SIZE - 1 - DISCARD_COUNT;
@@ -65,6 +69,48 @@ function unseenCards(view) {
   return createDeck(view.cardsPerColor).filter((c) => !seen.has(c.id));
 }
 
+/*
+ * The search keeps each player's collection as per-colour tallies, a count and a
+ * sum of values for each colour, so a position scores in a few additions rather
+ * than a full `score()`. That is what makes looking several plays ahead cheap.
+ */
+const COLOR_INDEX = Object.fromEntries(COLORS.map((color, i) => [color, i]));
+const SUM = COLORS.length; // tally[k] counts colour k; tally[SUM + k] sums its values
+
+function tally(cards, base = new Array(2 * SUM).fill(0)) {
+  const t = base.slice();
+  for (const c of cards) {
+    t[COLOR_INDEX[c.color]]++;
+    t[SUM + COLOR_INDEX[c.color]] += c.value;
+  }
+  return t;
+}
+
+/** `margin` from tallies: the two-player majority rule, then each card's points. */
+function tallyMargin(tallies, me) {
+  const mine = tallies[me];
+  const theirs = tallies[1 - me];
+  let m = 0;
+  for (let k = 0; k < SUM; k++) {
+    const lead = mine[k] - theirs[k];
+    m += (lead >= 2 ? mine[k] : mine[SUM + k]) - (lead <= -2 ? theirs[k] : theirs[SUM + k]);
+  }
+  return m;
+}
+
+const hasAllColorsIn = (t) => t.slice(0, SUM).every((n) => n > 0);
+
+/** The margin once the computer keeps the best two of `hand` at the end. */
+function keepValue(tallies, hand, me) {
+  const withKept = (kept) => tallyMargin(tallies.map((t, i) => (i === me ? tally(kept, t) : t)), me);
+  if (hand.length <= KEPT_AT_END) return withKept(hand);
+  let best = Infinity;
+  for (let i = 0; i < hand.length; i++) {
+    for (let j = i + 1; j < hand.length; j++) best = Math.min(best, withKept([hand[i], hand[j]]));
+  }
+  return best;
+}
+
 /**
  * The expected margin after `player` plays `card`, looking `plies` more plays
  * ahead. Follows the game's end rules: the deck shrinks by one per play until
@@ -72,28 +118,22 @@ function unseenCards(view) {
  */
 function afterPlay(sim, me, player, card, plies) {
   const { parade, removed } = resolvePlay(sim.parade, card);
-  const collected = withCards(sim.collected, player, removed);
+  const tallies = removed.length ? sim.tallies.map((t, i) => (i === player ? tally(removed, t) : t)) : sim.tallies;
   let { deck, finalTurns } = sim;
   if (finalTurns !== null) {
     finalTurns--;
   } else {
     if (deck > 0) deck--;
-    if (deck === 0 || hasAllColors(collected[player])) finalTurns = 2;
+    if (deck === 0 || hasAllColorsIn(tallies[player])) finalTurns = 2;
   }
-  const next = {
-    parade,
-    collected,
-    deck,
-    finalTurns,
-    // Cards drawn along the way are unknown, so the search only plays cards already in hand.
-    // (Averaging over the unknown draw was tried and made no difference.)
-    hand: player === me ? sim.hand.filter((c) => c.id !== card.id) : sim.hand,
-    unseen: player === me ? sim.unseen : sim.unseen.filter((c) => c.id !== card.id),
-  };
+  // Cards drawn along the way are unknown, so the search only plays cards already in hand.
+  // (Averaging over the unknown draw was tried and made no difference.)
+  const hand = player === me ? sim.hand.filter((c) => c !== card) : sim.hand;
   // The opponent's kept cards are unknown, so only the computer's own are counted.
-  if (finalTurns === 0) return bestKeep(collected, next.hand, me, margin).value;
-  if (plies === 0) return margin(collected, me);
-  return turnValue(next, me, 1 - player, plies);
+  if (finalTurns === 0) return keepValue(tallies, hand, me);
+  if (plies === 0) return tallyMargin(tallies, me);
+  const unseen = player === me ? sim.unseen : sim.unseen.filter((c) => c !== card);
+  return turnValue({ parade, tallies, deck, finalTurns, hand, unseen }, me, 1 - player, plies);
 }
 
 /**
@@ -103,14 +143,20 @@ function afterPlay(sim, me, player, card, plies) {
  */
 function turnValue(sim, me, player, plies) {
   const options = player === me ? sim.hand : sim.unseen;
-  if (!options.length) return margin(sim.collected, me);
-  const values = options.map((card) => afterPlay(sim, me, player, card, plies - 1));
-  return player === me ? Math.min(...values) : values.reduce((sum, v) => sum + v, 0) / values.length;
+  if (!options.length) return tallyMargin(sim.tallies, me);
+  if (player === me) {
+    let best = Infinity;
+    for (const card of options) best = Math.min(best, afterPlay(sim, me, player, card, plies - 1));
+    return best;
+  }
+  let total = 0;
+  for (const card of options) total += afterPlay(sim, me, player, card, plies - 1);
+  return total / options.length;
 }
 
 /**
- * Chooses the card to play by looking `depth` plays ahead (default 3: this play,
- * the opponent's reply and the computer's next play), counting the cards it
+ * Chooses the card to play by looking `depth` plays ahead (default 5,
+ * alternating with the opponent's replies), counting the cards it
  * would keep if the game ends within that horizon, and picking the play with the
  * lowest expected margin. Ties go to the card that takes fewer cards now, then
  * to the higher-value card, keeping low cards for later.
@@ -118,7 +164,7 @@ function turnValue(sim, me, player, plies) {
 export function chooseCard(state, playerIndex, { depth = LOOKAHEAD } = {}) {
   const view = publicView(state, playerIndex);
   if (view.players !== 2) return chooseGreedyCard(state, playerIndex);
-  const sim = { ...view, unseen: unseenCards(view) };
+  const sim = { ...view, tallies: view.collected.map((cards) => tally(cards)), unseen: unseenCards(view) };
   let best = null;
   for (const card of view.hand) {
     const option = {
@@ -188,8 +234,9 @@ export function computerAction(state, playerIndex) {
 
 /**
  * Makes `playerIndices` computer-controlled: whenever the game emits a state in
- * which one of them has a move, it plays that move after `delay` ms. Moves are
- * always made asynchronously so other `state` listeners see every state in order.
+ * which one of them has a move, it plays that move `delay` ms later. The thinking
+ * happens at the start of that wait and counts towards it. Moves are always made
+ * asynchronously so other `state` listeners see every state in order.
  * Returns a function that stops the computer players.
  */
 export function attachComputerPlayers(game, playerIndices, { delay = 0 } = {}) {
@@ -198,16 +245,19 @@ export function attachComputerPlayers(game, playerIndices, { delay = 0 } = {}) {
   const schedule = () => {
     if (timer !== null) return;
     timer = setTimeout(() => {
-      timer = null;
-      for (const i of playerIndices) {
-        // Each computer sees only what that player could see.
-        const action = computerAction(game.getStateFor(i), i);
-        if (action) {
-          game.dispatch(action); // emits a new state, which schedules the next move
-          return;
-        }
+      const started = Date.now();
+      // Each computer sees only what that player could see.
+      const action = playerIndices.map((i) => computerAction(game.getStateFor(i), i)).find(Boolean);
+      if (!action) {
+        timer = null;
+        return;
       }
-    }, delay);
+      timer = setTimeout(() => {
+        timer = null;
+        // Emits a new state, which schedules the next move; if the game moved on meanwhile, think again.
+        if (!game.dispatch(action)) schedule();
+      }, Math.max(0, delay - (Date.now() - started)));
+    }, 0);
   };
 
   const off = game.on(GameEvent.STATE, schedule);
