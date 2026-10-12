@@ -530,8 +530,6 @@ dialog::backdrop { background: rgba(25, 15, 30, .5); }
 .field { display: grid; gap: 6px; }
 .field-head { font-weight: 600; font-size: 17px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .field-note { font-weight: 400; font-size: 14px; font-style: italic; color: var(--muted); }
-output { font: 800 20px var(--numerals); font-variant-numeric: lining-nums tabular-nums; }
-input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 
 /* The daily deal and your best score differential. */
 .daily {
@@ -555,7 +553,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .daily-result.best { border: 1px solid var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); }
 .history { width: 100%; border-collapse: collapse; font-size: 15px; margin-top: 8px; }
 .history td { padding: 5px 4px; border-bottom: 1px solid var(--line); }
-.history td:nth-child(2), .history td:nth-child(4) { color: var(--muted); font-style: italic; }
+.history td:last-child { color: var(--muted); font-style: italic; }
 .history td.diff { text-align: right; font-size: 17px; }
 .history td:last-child { text-align: right; }
 

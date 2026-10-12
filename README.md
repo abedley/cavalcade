@@ -57,13 +57,13 @@ Pass `cardsPerColor` (default 11, values 0 to n-1) for a smaller deck and a shor
 
 ## Playing in the browser
 
-`index.html` is a mobile-first game page: you play a 2-player game against the computer, with a choice of 3–11 cards per suit (7 by default; the standard deck is 11). It fills the screen without scrolling, on phones (portrait or landscape) and on desktop. It is served by GitHub Pages at https://abedley.github.io/cavalcade/.
+`index.html` is a mobile-first game page: you play a 2-player game against the computer with 7 cards per suit (values 0–6, a 42-card deck; the standard deck is 11). It fills the screen without scrolling, on phones (portrait or landscape) and on desktop. It is served by GitHub Pages at https://abedley.github.io/cavalcade/.
 
 - Tap a card in your hand to preview the play. Cards you would take are lifted and outlined in red, a bar marks the safe zone, and the status line shows how many points the play adds. Tap the card again, or press **Play**, to play it.
 - Each player's collection is shown as six suit tiles with the card count and the points that suit is worth right now. ✓ marks a suit that currently has the majority, so it scores 1 per card.
-- **Daily deal:** every game on a given day uses that day's seed, so everyone who plays on the same date with the same cards per suit gets the same shuffle and the same starting player. The date is the player's local date, so the deal changes at their midnight; a game still in progress at midnight finishes on its own day's deal. The computer has no randomness, so the same moves always produce the same game, and **Play again** replays the day's deal.
-- **Daily bests:** when a game ends, the page saves your score differential (the CPU's score minus yours, so higher is better). It keeps your best and the number of games for each day and cards-per-suit setting. The new-game sheet shows today's best, the results sheet compares each game with it, and the menu lists your bests by day. Records are kept in the browser's local storage.
-- The menu has a new-game sheet (cards per suit), a "Show CPU hand" toggle, a Day / Night / Auto theme switch, the rules, and the game log. The results sheet breaks down each suit's cards and points.
+- **Daily deal:** every game on a given day uses that day's seed, so everyone who plays on the same date gets the same shuffle and the same starting player. The date is the player's local date, so the deal changes at their midnight; a game still in progress at midnight finishes on its own day's deal. The computer has no randomness, so the same moves always produce the same game, and **Play again** replays the day's deal.
+- **Daily bests:** when a game ends, the page saves your score differential (the CPU's score minus yours, so higher is better). It keeps your best and the number of games for each day. The new-game sheet shows today's best, the results sheet compares each game with it, and the menu lists your bests by day. Records are kept in the browser's local storage.
+- The menu has a new-game sheet, a "Show CPU hand" toggle, a Day / Night / Auto theme switch, the rules, and the game log. The results sheet breaks down each suit's cards and points.
 
 The look is a quiet nod to *Alice in Wonderland*:
 - **Pages:** parchment with a faint Looking-Glass chessboard by day. At night the background is plum and the cards take their suit colour, in brighter inks that stay easy to tell apart on a dark screen.

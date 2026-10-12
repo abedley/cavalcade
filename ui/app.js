@@ -7,8 +7,6 @@ import {
   DISCARD_COUNT,
   Game,
   GameEvent,
-  MAX_CARDS_PER_COLOR,
-  minCardsPerColor,
   msUntilMidnight,
   Phase,
   resolvePlay,
@@ -21,7 +19,7 @@ const HUMAN = 0;
 const CPU = 1;
 const PLAYERS = ['You', 'CPU'];
 const CPU_DELAY_MS = 900;
-const DEFAULT_PER_SUIT = 7;
+const PER_SUIT = 7; // fixed, so everyone's daily deal is the same game
 // Playing-card suits for the Queen's card soldiers, a crown, and the Cheshire Cat's crescent grin.
 const SUIT = { red: '♥', blue: '♦', green: '♣', yellow: '♛', purple: '☾', black: '♠' };
 const RULES = `<ul>
@@ -55,9 +53,9 @@ let resultsTimer = null;
 
 function loadPrefs() {
   try {
-    return { perSuit: DEFAULT_PER_SUIT, showCpu: false, theme: 'auto', ...JSON.parse(localStorage.getItem('cavalcade-prefs') ?? '{}') };
+    return { showCpu: false, theme: 'auto', ...JSON.parse(localStorage.getItem('cavalcade-prefs') ?? '{}') };
   } catch {
-    return { perSuit: DEFAULT_PER_SUIT, showCpu: false, theme: 'auto' };
+    return { showCpu: false, theme: 'auto' };
   }
 }
 
@@ -69,13 +67,17 @@ function savePrefs() {
   }
 }
 
-// ---------- Daily records: { 'YYYY-MM-DD': { [cardsPerSuit]: { best, plays } } } ----------
+// ---------- Daily records: { 'YYYY-MM-DD': { best, plays } } ----------
 
 const records = loadRecords();
 
 function loadRecords() {
   try {
-    return JSON.parse(localStorage.getItem('cavalcade-daily') ?? '{}') ?? {};
+    const saved = JSON.parse(localStorage.getItem('cavalcade-daily') ?? '{}') ?? {};
+    // Records from before the deck was fixed were kept per cards-per-suit; keep the 7s.
+    return Object.fromEntries(Object.entries(saved)
+      .map(([d, rec]) => [d, 'best' in rec ? rec : rec[PER_SUIT]])
+      .filter(([, rec]) => rec));
   } catch {
     return {};
   }
@@ -85,10 +87,10 @@ function loadRecords() {
  * Saves a finished game under its day. The differential is the CPU's score minus
  * yours, so bigger is better and a positive number is a win on points.
  */
-function recordResult(dayOf, perSuit, diff) {
-  const prev = records[dayOf]?.[perSuit];
+function recordResult(dayOf, diff) {
+  const prev = records[dayOf];
   const rec = { best: prev ? Math.max(prev.best, diff) : diff, plays: (prev?.plays ?? 0) + 1 };
-  (records[dayOf] ??= {})[perSuit] = rec;
+  records[dayOf] = rec;
   try {
     localStorage.setItem('cavalcade-daily', JSON.stringify(records));
   } catch {
@@ -104,13 +106,13 @@ const dayLabel = (key, opts = { weekday: 'long', day: 'numeric', month: 'long' }
 
 // ---------- Game lifecycle ----------
 
-function newGame({ perSuit = prefs.perSuit } = {}) {
+function newGame() {
   stopComputers?.();
   clearTimeout(resultsTimer);
   day = dayKey();
   seed = seedForDay(day);
   outcome = null;
-  game = new Game({ players: PLAYERS, cardsPerColor: perSuit, random: seededRandom(seed) });
+  game = new Game({ players: PLAYERS, cardsPerColor: PER_SUIT, random: seededRandom(seed) });
   selected.clear();
   lastMove = '';
   pendingMove = null;
@@ -129,14 +131,14 @@ function newGame({ perSuit = prefs.perSuit } = {}) {
   game.on(GameEvent.GAME_OVER, (results) => {
     log(`Game over. ${winnerText(results)}`);
     const [mine, theirs] = [HUMAN, CPU].map((i) => results.scores.find((s) => s.player === i).score);
-    outcome = recordResult(day, perSuit, theirs - mine);
+    outcome = recordResult(day, theirs - mine);
     resultsTimer = setTimeout(showResults, reducedMotion.matches ? 300 : 1100);
   });
 
   stopComputers = attachComputerPlayers(game, [CPU], { delay: CPU_DELAY_MS });
   game.start();
-  $('seedNote').textContent = `Deal of ${dayLabel(day)} · ${perSuit} cards per suit · seed ${seed}`;
-  log(`Deal of ${dayLabel(day)} (${perSuit} per suit). ${state.currentPlayer === HUMAN ? 'You start.' : 'CPU starts.'}`);
+  $('seedNote').textContent = `Deal of ${dayLabel(day)} · seed ${seed}`;
+  log(`Deal of ${dayLabel(day)}. ${state.currentPlayer === HUMAN ? 'You start.' : 'CPU starts.'}`);
 }
 
 const nameOf = (i) => (i === HUMAN ? 'You' : 'CPU');
@@ -505,7 +507,7 @@ function renderOutcome() {
     : outcome.first ? `Your first game of ${today ? 'today’s' : 'that'} deal.`
     : `Your best ${when}: ${signed(outcome.best)}`;
   el.innerHTML = `<span class="diff ${outcome.diff > 0 ? 'up' : outcome.diff < 0 ? 'down' : ''}">${signed(outcome.diff)}</span>`
-    + `<span><b>Score differential</b><span class="field-note">${note} · ${plays(outcome.plays)} at ${state.cardsPerColor} per suit</span></span>`;
+    + `<span><b>Score differential</b><span class="field-note">${note} · ${plays(outcome.plays)} ${today ? 'today' : 'that day'}</span></span>`;
   el.classList.toggle('best', outcome.improved);
   // After midnight, "again" deals the new day's cards.
   $('againBtn').textContent = today ? 'Play again' : 'Play today’s deal';
@@ -514,11 +516,10 @@ function renderOutcome() {
 function renderDaily() {
   const today = dayKey();
   $('dailyDate').textContent = dayLabel(today);
-  const n = Number($('perSuit').value);
-  const rec = records[today]?.[n];
+  const rec = records[today];
   $('dailyBest').innerHTML = rec
-    ? `Your best at ${n} per suit: <b class="diff ${rec.best > 0 ? 'up' : rec.best < 0 ? 'down' : ''}">${signed(rec.best)}</b> · ${plays(rec.plays)}`
-    : `Not played yet at ${n} per suit.`;
+    ? `Your best today: <b class="diff ${rec.best > 0 ? 'up' : rec.best < 0 ? 'down' : ''}">${signed(rec.best)}</b> · ${plays(rec.plays)}`
+    : 'Not played yet today.';
 }
 
 function renderHistory() {
@@ -527,11 +528,12 @@ function renderHistory() {
     $('history').innerHTML = '<p class="field-note">No finished games yet. Your best score differential for each day will appear here.</p>';
     return;
   }
-  const rows = days.flatMap((d) => Object.entries(records[d])
-    .sort(([a], [b]) => b - a)
-    .map(([n, rec]) => `<tr><td>${dayLabel(d, { weekday: 'short', day: 'numeric', month: 'short' })}</td>`
-      + `<td>${n} per suit</td><td class="diff ${rec.best > 0 ? 'up' : rec.best < 0 ? 'down' : ''}">${signed(rec.best)}</td>`
-      + `<td>${plays(rec.plays)}</td></tr>`));
+  const rows = days.map((d) => {
+    const rec = records[d];
+    return `<tr><td>${dayLabel(d, { weekday: 'short', day: 'numeric', month: 'short' })}</td>`
+      + `<td class="diff ${rec.best > 0 ? 'up' : rec.best < 0 ? 'down' : ''}">${signed(rec.best)}</td>`
+      + `<td>${plays(rec.plays)}</td></tr>`;
+  });
   $('history').innerHTML = `<table class="history"><tbody>${rows.join('')}</tbody></table>
     <p class="field-note">Best differential is the CPU’s score minus yours: higher is better.</p>`;
 }
@@ -546,34 +548,17 @@ function watchMidnight() {
 }
 
 function openSetup() {
-  const min = minCardsPerColor(PLAYERS.length);
-  const range = $('perSuit');
-  range.min = min;
-  range.max = MAX_CARDS_PER_COLOR;
-  range.value = Math.min(MAX_CARDS_PER_COLOR, Math.max(min, prefs.perSuit));
-  updatePerSuit();
+  renderDaily();
   $('setupCancel').hidden = !game;
   $('setup').returnValue = '';
   $('setup').showModal();
 }
 
-function updatePerSuit() {
-  const n = Number($('perSuit').value);
-  $('perSuitOut').textContent = n;
-  $('perSuitNote').textContent = `Values 0–${n - 1} · ${n * COLORS.length}-card deck`
-    + (n === MAX_CARDS_PER_COLOR ? ' (standard)' : '');
-  renderDaily();
-}
-
 for (const el of document.querySelectorAll('[data-rules]')) el.innerHTML = RULES;
-
-$('perSuit').addEventListener('input', updatePerSuit);
 
 $('setup').addEventListener('close', () => {
   if ($('setup').returnValue === 'start') {
-    prefs.perSuit = Number($('perSuit').value);
-    savePrefs();
-    newGame({ perSuit: prefs.perSuit });
+    newGame();
   } else if (!game) {
     openSetup(); // there has to be a game behind the sheet
   }
@@ -588,7 +573,7 @@ $('menu').addEventListener('close', () => {
 });
 
 $('results').addEventListener('close', () => {
-  if ($('results').returnValue === 'again') newGame({ perSuit: state.cardsPerColor });
+  if ($('results').returnValue === 'again') newGame();
   if ($('results').returnValue === 'settings') openSetup();
 });
 
