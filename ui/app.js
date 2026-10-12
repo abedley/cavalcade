@@ -49,9 +49,9 @@ let resultsTimer = null;
 
 function loadPrefs() {
   try {
-    return { perSuit: DEFAULT_PER_SUIT, showCpu: false, ...JSON.parse(localStorage.getItem('cavalcade-prefs') ?? '{}') };
+    return { perSuit: DEFAULT_PER_SUIT, showCpu: false, theme: 'auto', ...JSON.parse(localStorage.getItem('cavalcade-prefs') ?? '{}') };
   } catch {
-    return { perSuit: DEFAULT_PER_SUIT, showCpu: false };
+    return { perSuit: DEFAULT_PER_SUIT, showCpu: false, theme: 'auto' };
   }
 }
 
@@ -221,7 +221,7 @@ function renderSide(i, live) {
     tile.className = `tile ${color}${cards.length ? '' : ' empty'}${flip ? ' flip' : ''}`;
     tile.dataset.color = color;
     tile.title = cards.length ? `${color}: ${cards.map((c) => c.value).join(', ')}` : `no ${color}`;
-    tile.innerHTML = cards.length ? `<b>${cards.length}</b><small>${pts} pt</small>` : `<b>${SUIT[color]}</b>`;
+    tile.innerHTML = cards.length ? `<b>${cards.length}</b><small>${pts}pt</small>` : `<b>${SUIT[color]}</b>`;
     return tile;
   }));
 
@@ -511,6 +511,29 @@ $('menuBtn').onclick = () => {
   $('menu').returnValue = '';
   $('menu').showModal();
 };
+// ---------- Theme ----------
+
+const systemDark = matchMedia('(prefers-color-scheme: dark)');
+
+function applyTheme() {
+  const dark = prefs.theme === 'dark' || (prefs.theme !== 'light' && systemDark.matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]').content = dark ? '#211a2e' : '#f3e9d2';
+  for (const btn of document.querySelectorAll('[data-theme-choice]')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.themeChoice === prefs.theme));
+  }
+}
+
+for (const btn of document.querySelectorAll('[data-theme-choice]')) {
+  btn.onclick = () => {
+    prefs.theme = btn.dataset.themeChoice;
+    savePrefs();
+    applyTheme();
+  };
+}
+systemDark.addEventListener('change', applyTheme);
+applyTheme();
+
 $('showCpu').checked = prefs.showCpu;
 $('showCpu').onchange = () => {
   prefs.showCpu = $('showCpu').checked;

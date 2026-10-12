@@ -61,10 +61,10 @@ Pass `cardsPerColor` (default 11, values 0 to n-1) for a smaller deck and a shor
 
 - Tap a card in your hand to preview the play. Cards you would take are lifted and outlined in red, a bar marks the safe zone, and the status line shows how many points the play adds. Tap the card again, or press **Play**, to play it.
 - Each player's collection is shown as six suit tiles with the card count and the points that suit is worth right now. ✓ marks a suit that currently has the majority, so it scores 1 per card.
-- The menu has a new-game sheet (cards per suit, optional seed), a "Show CPU hand" toggle, the rules, and the game log. The results sheet breaks down each suit's cards and points.
+- The menu has a new-game sheet (cards per suit, optional seed), a "Show CPU hand" toggle, a Day / Night / Auto theme switch, the rules, and the game log. The results sheet breaks down each suit's cards and points.
 
 The look is a quiet nod to *Alice in Wonderland*:
-- **Pages:** parchment with a faint Looking-Glass chessboard (a night-time plum in dark mode).
+- **Pages:** parchment with a faint Looking-Glass chessboard by day. At night the background is plum and the cards take their suit colour, in brighter inks that stay easy to tell apart on a dark screen.
 - **Cards:** cream playing cards with coloured frames, like the Queen's card soldiers. The suits are ♥ ♦ ♣ ♠, plus a crown (♛) and the Cheshire Cat's crescent (☾).
 - **Fonts:** IM Fell English, EB Garamond and Playfair Display, from Google Fonts.
 

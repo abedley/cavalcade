@@ -3,8 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f3e9d2" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#211a2e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3e9d2">
+<script>
+  // Pick the theme before the page draws, so there's no flash of the wrong one.
+  (function () {
+    var theme;
+    try { theme = JSON.parse(localStorage.getItem('cavalcade-prefs') || '{}').theme; } catch (e) {}
+    var dark = theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  })();
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Cavalcade</title>
@@ -86,6 +94,13 @@
       <button class="menu-item" value="new">New game…</button>
       <button class="menu-item" value="results" id="menuResults" hidden>Show results</button>
       <label class="menu-item toggle"><span>Show CPU hand</span><input type="checkbox" id="showCpu"></label>
+      <div class="menu-item static"><span>Theme</span>
+        <span class="seg" role="group" aria-label="Theme">
+          <button type="button" data-theme-choice="auto">Auto</button>
+          <button type="button" data-theme-choice="light">Day</button>
+          <button type="button" data-theme-choice="dark">Night</button>
+        </span>
+      </div>
     </div>
     <details class="rules"><summary>How to play</summary><div class="rules-body" data-rules></div></details>
     <details class="rules" open><summary>Game log</summary><ol id="log"></ol></details>

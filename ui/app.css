@@ -31,26 +31,31 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  /* Down the rabbit hole: night plum, with parchment ink. */
-  :root {
-    --bg: #211a2e;
-    --bg-2: #120e1a;
-    --check: rgba(239, 228, 204, .03);
-    --fg: #efe4cc;
-    --muted: #a8977c;
-    --line: rgba(239, 228, 204, .14);
-    --panel: rgba(239, 228, 204, .05);
-    --sheet: #261e33;
-    --face: #f6eedb;
-    --accent: #4f83b8;
-    --gold: #d4a845;
-    --danger: #d0453f;
-    --good: #7fb36b;
-    --black: #3d3129;
-    --card-edge: rgba(0, 0, 0, .4);
-    color-scheme: dark;
-  }
+/* Down the rabbit hole: night plum, with parchment ink. index.html sets data-theme from the
+   saved choice or the system setting before the page draws. */
+:root[data-theme="dark"] {
+  --bg: #211a2e;
+  --bg-2: #120e1a;
+  --check: rgba(239, 228, 204, .03);
+  --fg: #efe4cc;
+  --muted: #a8977c;
+  --line: rgba(239, 228, 204, .14);
+  --panel: rgba(239, 228, 204, .05);
+  --sheet: #261e33;
+  --face: #f6eedb;
+  --accent: #4f83b8;
+  --gold: #d4a845;
+  --danger: #d0453f;
+  --good: #7fb36b;
+  /* Brighter and further apart than the daytime inks, so suits stay distinct on a dark screen. */
+  --red: #e0473c;
+  --blue: #3b8fe8;
+  --green: #3da64e;
+  --yellow: #f2c418;
+  --purple: #a45fd6;
+  --black: #3e3935;
+  --card-edge: rgba(0, 0, 0, .45);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -209,15 +214,17 @@ button { font: inherit; color: inherit; }
   background: var(--c);
   color: var(--face);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  line-height: 1.05;
+  gap: 3px;
+  padding: 0 4px;
+  line-height: 1;
+  white-space: nowrap;
   position: relative;
   text-shadow: 0 1px 1px rgba(0, 0, 0, .25);
   box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 0 0 3px var(--c), inset 0 0 0 4px rgba(251, 245, 230, .45);
 }
-.tile b { font: 800 clamp(14px, calc(var(--th) * .42), 21px) var(--numerals); font-variant-numeric: lining-nums tabular-nums; }
+.tile b { font: 900 clamp(15px, calc(var(--th) * .5), 22px) var(--numerals); font-variant-numeric: lining-nums tabular-nums; }
 .tile small { font-size: 12px; font-style: italic; opacity: .95; font-variant-numeric: lining-nums tabular-nums; }
 .tile.empty {
   background: transparent;
@@ -247,9 +254,8 @@ button { font: inherit; color: inherit; }
 }
 .tile.yellow:not(.empty) { color: #3b2a00; text-shadow: none; }
 .tile.empty b { font-family: var(--serif); }
-@media (prefers-color-scheme: dark) {
-  .tile.black.empty { --c: var(--muted); }
-}
+:root[data-theme="dark"] .tile.black { box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 0 0 3px var(--c), inset 0 0 0 4px #bdb5a8; }
+:root[data-theme="dark"] .tile.black.empty { --c: var(--muted); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 45%, transparent); }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ---------- Parade ---------- */
@@ -359,19 +365,20 @@ button { font: inherit; color: inherit; }
   flex-direction: column;
   align-items: center;
   font-family: var(--numerals);
-  font-weight: 800;
-  font-size: calc(var(--w) * .33);
+  font-weight: 900;
+  font-size: calc(var(--w) * .36);
+  -webkit-text-stroke: .025em currentColor;
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
 }
-.card .corner i { font-family: var(--serif); font-style: normal; font-weight: 400; font-size: .58em; margin-top: .08em; }
+.card .corner i { font-family: var(--serif); font-style: normal; font-weight: 400; font-size: .6em; margin-top: .06em; -webkit-text-stroke: 0; }
 .card .suit-big {
   position: absolute;
   right: 12%;
   bottom: 8%;
   font-size: calc(var(--w) * .52);
   line-height: 1;
-  opacity: .26;
+  opacity: .34;
 }
 .card.back {
   background:
@@ -389,9 +396,23 @@ button { font: inherit; color: inherit; }
 .purple { --c: var(--purple); }
 .black { --c: var(--black); }
 .card.yellow { --ink: #8a6406; }
-@media (prefers-color-scheme: dark) {
-  .card.black { --ink: #2e241d; }
+/* At night the faces take the suit colour, framed in a paler tint of it, with cream numerals. */
+:root[data-theme="dark"] .card {
+  --ink: #fff8e8;
+  background: color-mix(in srgb, var(--c) 50%, #f6eedb);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
 }
+:root[data-theme="dark"] .card::before {
+  background: radial-gradient(130% 90% at 30% 20%, color-mix(in srgb, var(--c) 82%, #fff) 0%, var(--c) 55%, color-mix(in srgb, var(--c) 78%, #000) 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25);
+}
+:root[data-theme="dark"] .card .suit-big { opacity: .3; }
+:root[data-theme="dark"] .card.yellow { --ink: #2b1d00; text-shadow: none; }
+:root[data-theme="dark"] .card.black { background: #bdb5a8; }
+:root[data-theme="dark"] .card.back { background:
+    repeating-linear-gradient(45deg, rgba(251, 245, 230, .45) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(-45deg, rgba(251, 245, 230, .45) 0 1px, transparent 1px 4px),
+    #8a2626; }
 
 .card.taking {
   transform: translateY(-11px);
@@ -540,6 +561,18 @@ input[type=number]::placeholder { color: var(--muted); font-style: italic; }
   font-size: 17px;
 }
 .menu-item input { width: 20px; height: 20px; accent-color: var(--accent); }
+.menu-item.static { cursor: default; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button {
+  border: 0;
+  background: transparent;
+  padding: 6px 12px;
+  font-size: 15px;
+  cursor: pointer;
+  min-height: 34px;
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fbf5e6; }
 
 .rules { border-top: 1px solid var(--line); padding-top: 10px; }
 .rules summary { font: italic 400 19px var(--display); cursor: pointer; }
