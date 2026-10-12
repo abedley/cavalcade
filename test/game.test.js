@@ -112,10 +112,24 @@ for (const players of [['A', 'B'], ['A', 'B', 'C', 'D'], ['A', 'B', 'C', 'D', 'E
       state.players.forEach((p, i) => {
         assert.equal(results, undefined);
         assert.equal(game.dispatch({ type: ActionType.DISCARD_CARDS, player: i, cardIds: [p.hand[0].id, p.hand[1].id] }), true);
+        if (i === 0) {
+          // Discards stay secret, and collections unchanged, until everyone has chosen.
+          const mid = game.getState();
+          assert.deepEqual(mid.players[0].collected, p.collected);
+          assert.deepEqual(mid.players[0].discarded.map((c) => c.id), [p.hand[0].id, p.hand[1].id]);
+          assert.equal(game.getStateFor(1).players[0].discarded, null);
+          assert.equal(game.getStateFor(1).players[0].kept, null);
+        }
       });
 
       const end = game.getState();
       assert.equal(end.phase, Phase.FINISHED);
+      end.players.forEach((p, i) => {
+        assert.deepEqual(p.discarded, state.players[i].hand.slice(0, 2));
+        assert.deepEqual(p.kept, state.players[i].hand.slice(2));
+        assert.deepEqual(p.collected.slice(-2), p.kept);
+      });
+      assert.deepEqual(game.getStateFor(1).players[0].discarded, end.players[0].discarded);
       assert.ok(results.winners.length >= 1);
       assert.deepEqual(end.results, results);
 

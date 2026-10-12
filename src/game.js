@@ -133,6 +133,9 @@ export class Game extends Emitter {
       players: this.#players.map((p, i) => ({
         ...p,
         hasDiscarded: this.#discards.has(i),
+        // The two cards thrown away and the two added to the collection, once chosen.
+        discarded: this.#discards.get(i)?.discarded ?? null,
+        kept: this.#discards.get(i)?.kept ?? null,
       })),
       parade: this.#parade,
       deckCount: this.#deck?.length ?? 0,
@@ -142,13 +145,16 @@ export class Game extends Emitter {
     });
   }
 
-  /** State as seen by one player: other players' hands are hidden, only their sizes shown. */
+  /**
+   * State as seen by one player: other players' hands are hidden, only their sizes
+   * shown, and so are their discards until everyone has chosen.
+   */
   getStateFor(playerIndex) {
     const state = this.getState();
     state.players = state.players.map((p, i) =>
       i === playerIndex || state.phase === Phase.FINISHED
         ? p
-        : { ...p, hand: undefined, handCount: p.hand.length },
+        : { ...p, hand: undefined, handCount: p.hand.length, discarded: null, kept: null },
     );
     return state;
   }
@@ -190,7 +196,11 @@ export class Game extends Emitter {
     }
   }
 
-  /** Each player picks two cards to discard; the rest of their hand is added to their collection. */
+  /**
+   * Each player picks two cards to discard; the rest of their hand is added to
+   * their collection. The choices are secret until everyone has made theirs, so
+   * collections only change once the last player has discarded.
+   */
   #discardCards({ player, cardIds }) {
     this.#assertPhase(Phase.DISCARD);
     const p = this.#players[player];
@@ -202,11 +212,14 @@ export class Game extends Emitter {
     for (const id of cardIds) {
       if (!p.hand.some((c) => c.id === id)) throw new InvalidActionError(`Card ${id} is not in hand`);
     }
-    this.#discards.set(player, p.hand.filter((c) => cardIds.includes(c.id)));
-    p.collected.push(...p.hand.filter((c) => !cardIds.includes(c.id)));
+    this.#discards.set(player, {
+      discarded: p.hand.filter((c) => cardIds.includes(c.id)),
+      kept: p.hand.filter((c) => !cardIds.includes(c.id)),
+    });
     p.hand = [];
 
     if (this.#discards.size === this.#players.length) {
+      this.#players.forEach((pl, i) => pl.collected.push(...this.#discards.get(i).kept));
       this.#phase = Phase.FINISHED;
       this.#results = score(this.#players.map((pl) => pl.collected));
       this.emit(GameEvent.GAME_OVER, structuredClone(this.#results));

@@ -47,7 +47,6 @@ let stopComputers = null;
 let selected = new Set();
 let lastMove = '';
 let pendingMove = null;
-let resultsTimer = null;
 
 // ---------- Preferences (best effort; the page works without storage) ----------
 
@@ -108,7 +107,6 @@ const dayLabel = (key, opts = { weekday: 'long', day: 'numeric', month: 'long' }
 
 function newGame() {
   stopComputers?.();
-  clearTimeout(resultsTimer);
   day = dayKey();
   seed = seedForDay(day);
   outcome = null;
@@ -132,7 +130,8 @@ function newGame() {
     log(`Game over. ${winnerText(results)}`);
     const [mine, theirs] = [HUMAN, CPU].map((i) => results.scores.find((s) => s.player === i).score);
     outcome = recordResult(day, theirs - mine);
-    resultsTimer = setTimeout(showResults, reducedMotion.matches ? 300 : 1100);
+    const cpu = game.getState().players[CPU];
+    log(`CPU kept ${cpu.kept.map(fmt).join(' ')} and discarded ${cpu.discarded.map(fmt).join(' ')}.`);
   });
 
   stopComputers = attachComputerPlayers(game, [CPU], { delay: CPU_DELAY_MS });
@@ -271,13 +270,50 @@ function renderSide(i, live) {
   }));
 
   if (i === CPU) {
-    const showHand = prefs.showCpu && p.hand.length;
+    const finished = state.phase === Phase.FINISHED;
+    // Once the CPU has chosen its discards it still holds its four cards until the reveal.
+    const held = p.hand.length || finished ? p.hand : [...(p.kept ?? []), ...(p.discarded ?? [])];
+    const showHand = prefs.showCpu && held.length;
     $('cpuHand').classList.toggle('open', Boolean(showHand));
-    $('cpuHand').replaceChildren(...(showHand ? p.hand.map((c) => cardEl(c)) : p.hand.map(backEl)));
+    $('cpuHand').replaceChildren(...(showHand ? held.map((c) => cardEl(c)) : held.map(backEl)));
+    const reveal = $('cpuReveal');
+    if (!finished) {
+      reveal.hidden = true;
+      reveal.replaceChildren();
+    } else if (reveal.hidden) {
+      // Built once, so later re-renders don't replay the flip.
+      reveal.replaceChildren(...revealGroups(p, { flip: true }));
+      reveal.hidden = false;
+    }
   } else {
     const n = p.collected.length;
     $('youHint').textContent = n ? `${n} collected` : '';
   }
+}
+
+/** The final hand split into the two cards kept and the two discarded, optionally turning face up. */
+function revealGroups(p, { flip = false } = {}) {
+  let k = 0;
+  const group = (label, cards, cls) => {
+    const el = document.createElement('div');
+    el.className = `reveal-group ${cls}`;
+    const row = document.createElement('div');
+    row.className = 'reveal-cards';
+    row.append(...cards.map((c) => {
+      if (!flip) return cardEl(c);
+      const flipper = document.createElement('div');
+      flipper.className = 'flipper';
+      flipper.style.setProperty('--i', k++);
+      flipper.append(backEl(), cardEl(c));
+      return flipper;
+    }));
+    const name = document.createElement('span');
+    name.className = 'reveal-label';
+    name.textContent = label;
+    el.append(name, row);
+    return el;
+  };
+  return [group('Kept', p.kept, 'kept'), group('Discarded', p.discarded, 'discarded')];
 }
 
 function renderParade(preview) {
@@ -364,9 +400,11 @@ function renderStatus(preview) {
   } else if (state.phase === Phase.DISCARD) {
     prompt.textContent = 'CPU is discarding…';
   } else {
-    prompt.textContent = winnerText(state.results);
+    const cpu = state.players[CPU];
+    $('lastMove').textContent = `The end. ${winnerText(state.results)}`;
+    prompt.textContent = `The CPU kept ${cpu.kept.map(fmt).join(' ')} and discarded ${cpu.discarded.map(fmt).join(' ')}`;
     btn.hidden = false;
-    btn.textContent = 'Results';
+    btn.textContent = 'See results';
   }
 }
 
@@ -379,10 +417,14 @@ function renderHand() {
   const canAct = myTurn() || myDiscard();
   hand.classList.toggle('idle', !canAct);
   const cards = human().hand;
+  if (state.phase === Phase.FINISHED) {
+    hand.replaceChildren(...revealGroups(human()));
+    return;
+  }
   if (!cards.length) {
     const note = document.createElement('div');
     note.className = 'hand-note';
-    note.textContent = state.phase === Phase.FINISHED ? 'The end.' : '';
+    note.textContent = myDiscard() ? '' : 'Waiting for the CPU…';
     hand.replaceChildren(note);
     return;
   }
