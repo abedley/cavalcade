@@ -7,6 +7,7 @@ import {
   DISCARD_COUNT,
   Game,
   GameEvent,
+  HAND_SIZE,
   msUntilMidnight,
   Phase,
   resolvePlay,
@@ -20,6 +21,7 @@ const CPU = 1;
 const PLAYERS = ['You', 'CPU'];
 const CPU_DELAY_MS = 900;
 const PER_SUIT = 7; // fixed, so everyone's daily deal is the same game
+const KEEP_COUNT = HAND_SIZE - 1 - DISCARD_COUNT; // the final hand is one card short
 // Playing-card suits for the Queen's card soldiers, a crown, and the Cheshire Cat's crescent grin.
 const SUIT = { red: '♥', blue: '♦', green: '♣', yellow: '♛', purple: '☾', black: '♠' };
 const RULES = `<ul>
@@ -30,7 +32,7 @@ const RULES = `<ul>
   <li>Taken cards score their face value, but if you hold the most of a colour they score
     1 each (✓). With two players you need at least 2 more of that colour than your opponent.</li>
   <li>When someone has collected all six colours, or the deck runs out, each player takes one
-    last turn without drawing. Then you discard 2 of your 4 cards; the other 2 join your collection.</li>
+    last turn without drawing. Then you pick 2 of your 4 cards to keep; they join your collection and the other 2 are discarded.</li>
   <li>Lowest score wins. Ties go to whoever collected fewer cards.</li>
 </ul>`;
 
@@ -191,11 +193,12 @@ function act() {
     const [cardId] = selected;
     selected.clear();
     game.dispatch({ type: ActionType.PLAY_CARD, player: HUMAN, cardId });
-  } else if (myDiscard() && selected.size === DISCARD_COUNT) {
-    const cardIds = [...selected];
+  } else if (myDiscard() && selected.size === KEEP_COUNT) {
+    const kept = human().hand.filter((c) => selected.has(c.id));
+    const discarded = human().hand.filter((c) => !selected.has(c.id));
     selected.clear();
-    log(`You discarded ${human().hand.filter((c) => cardIds.includes(c.id)).map(fmt).join(' ')}.`);
-    game.dispatch({ type: ActionType.DISCARD_CARDS, player: HUMAN, cardIds });
+    log(`You kept ${kept.map(fmt).join(' ')} and discarded ${discarded.map(fmt).join(' ')}.`);
+    game.dispatch({ type: ActionType.DISCARD_CARDS, player: HUMAN, cardIds: discarded.map((c) => c.id) });
   } else if (state?.phase === Phase.FINISHED) {
     showResults();
   }
@@ -207,7 +210,7 @@ function onHandCard(card) {
     selected = new Set([card.id]);
   } else if (myDiscard()) {
     if (selected.has(card.id)) selected.delete(card.id);
-    else if (selected.size < DISCARD_COUNT) selected.add(card.id);
+    else if (selected.size < KEEP_COUNT) selected.add(card.id);
     else selected = new Set([...selected].slice(1).concat(card.id));
   } else {
     return;
@@ -260,7 +263,8 @@ function renderSide(i, live) {
   $(i === HUMAN ? 'youTiles' : 'cpuTiles').replaceChildren(...COLORS.map((color) => {
     const cards = p.collected.filter((c) => c.color === color).sort((a, b) => a.value - b.value);
     const flip = live.majorities[color].includes(i);
-    const pts = flip ? cards.length : cards.reduce((n, c) => n + c.value, 0);
+    // Always the suit's face value; the player's total is what applies the majority.
+    const pts = cards.reduce((n, c) => n + c.value, 0);
     const tile = document.createElement('div');
     tile.className = `tile ${color}${cards.length ? '' : ' empty'}${flip ? ' flip' : ''}`;
     tile.dataset.color = color;
@@ -388,14 +392,14 @@ function renderStatus(preview) {
     prompt.textContent = state.finalRound ? 'Your last turn: pick a card' : 'Your turn: pick a card';
   } else if (myDiscard()) {
     btn.hidden = false;
-    btn.textContent = 'Discard';
-    btn.disabled = selected.size !== DISCARD_COUNT;
-    if (selected.size === DISCARD_COUNT) {
-      const kept = human().hand.filter((c) => !selected.has(c.id));
+    btn.textContent = 'Keep';
+    btn.disabled = selected.size !== KEEP_COUNT;
+    if (selected.size === KEEP_COUNT) {
+      const kept = human().hand.filter((c) => selected.has(c.id));
       const delta = scoreWith(kept).scores[HUMAN].score - scoreWith().scores[HUMAN].score;
       prompt.innerHTML = `Keep ${kept.map(fmt).join(' ')} · ${deltaHtml(delta)}`;
     } else {
-      prompt.textContent = `Discard ${DISCARD_COUNT} cards (${selected.size}/${DISCARD_COUNT}); the rest join your collection`;
+      prompt.textContent = `Pick ${KEEP_COUNT} cards to keep (${selected.size}/${KEEP_COUNT}); the rest are discarded`;
     }
   } else if (state.phase === Phase.DISCARD) {
     prompt.textContent = 'CPU is discarding…';
