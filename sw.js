@@ -15,7 +15,10 @@ self.addEventListener('fetch', (event) => {
 
 async function networkFirst(request) {
   const cache = await caches.open(CACHE);
-  const network = fetch(request).then((response) => {
+  // The game's own files skip the browser's HTTP cache (GitHub Pages lets it keep them for
+  // 10 minutes), so a fresh page never runs with yesterday's scripts.
+  const sameOrigin = new URL(request.url).origin === self.location.origin;
+  const network = fetch(sameOrigin ? new Request(request.url, { cache: 'no-cache' }) : request).then((response) => {
     if (response.ok || response.type === 'opaque') cache.put(request, response.clone());
     return response;
   });

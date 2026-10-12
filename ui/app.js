@@ -741,7 +741,26 @@ watchMidnight();
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 // Works offline once it has loaded, and asks the browser not to clear the daily bests.
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  // A Home Screen app resumes rather than reloading, so look for a new version whenever it comes
+  // back. When one takes over, reload so every file comes from it, unless a game is under way.
+  const hadWorker = Boolean(navigator.serviceWorker.controller);
+  let updated = false;
+  const reloadIfIdle = () => {
+    if (updated && !history.some((a) => a.player === HUMAN)) location.reload();
+  };
+  const checkForUpdate = () => navigator.serviceWorker.getRegistration().then((reg) => reg?.update()).catch(() => {});
+  navigator.serviceWorker.register('sw.js').then(checkForUpdate, () => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    updated = hadWorker;
+    reloadIfIdle();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    reloadIfIdle();
+    checkForUpdate();
+  });
+}
 navigator.storage?.persist?.().catch(() => {});
 
 openSetup();
