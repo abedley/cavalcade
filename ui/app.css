@@ -20,6 +20,7 @@
   --purple: #74408c;
   --black: #2e241d;
   --card-edge: rgba(43, 29, 20, .25);
+  --status-bar: #3a2718;
   --display: "IM Fell English", "Iowan Old Style", Georgia, serif;
   --serif: "EB Garamond", "Iowan Old Style", Georgia, serif;
   --numerals: "Playfair Display", Georgia, serif;
@@ -55,6 +56,7 @@
   --purple: #a45fd6;
   --black: #3e3935;
   --card-edge: rgba(0, 0, 0, .45);
+  --status-bar: #120e1a;
   color-scheme: dark;
 }
 
@@ -78,9 +80,23 @@ body {
      shorthand reset this, so they set it again. */
   font-variant-numeric: lining-nums;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none; /* no press-and-hold previews on iPhone */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Opened from the iPhone Home Screen, the page runs under a see-through status bar with white
+   text. This band keeps the clock readable on parchment; it has no height anywhere else. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top);
+  background: var(--status-bar);
+  z-index: 1;
 }
 
 button { font: inherit; color: inherit; }
@@ -97,7 +113,7 @@ button { font: inherit; color: inherit; }
   grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   padding:
-    max(6px, env(safe-area-inset-top))
+    calc(6px + env(safe-area-inset-top))
     max(var(--pad), env(safe-area-inset-right))
     max(8px, env(safe-area-inset-bottom))
     max(var(--pad), env(safe-area-inset-left));
@@ -526,7 +542,7 @@ dialog {
   color: var(--fg);
   width: min(100%, 560px);
   max-width: 100%;
-  max-height: 92dvh;
+  max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top) - 16px));
   margin: auto auto 0;
   border-radius: 14px 14px 0 0;
   border-top: 1px solid var(--line);

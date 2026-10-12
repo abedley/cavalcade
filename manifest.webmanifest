@@ -1,0 +1,16 @@
+{
+  "name": "Cavalcade",
+  "short_name": "Cavalcade",
+  "description": "A daily game of Parade against the computer.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3e9d2",
+  "theme_color": "#f3e9d2",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

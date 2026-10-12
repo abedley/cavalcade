@@ -687,4 +687,11 @@ document.addEventListener('visibilitychange', () => {
 });
 watchMidnight();
 
+// Played from the Home Screen like an app: pinching shouldn't zoom the table.
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+// Works offline once it has loaded, and asks the browser not to clear the daily bests.
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+navigator.storage?.persist?.().catch(() => {});
+
 openSetup();
