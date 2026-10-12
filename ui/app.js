@@ -18,7 +18,7 @@ import {
 
 const HUMAN = 0;
 const CPU = 1;
-const PLAYERS = ['You', 'CPU'];
+const PLAYERS = ['You', 'Alice'];
 const CPU_DELAY_MS = 900;
 const PER_SUIT = 7; // fixed, so everyone's daily deal is the same game
 const KEEP_COUNT = HAND_SIZE - 1 - DISCARD_COUNT; // the final hand is one card short
@@ -49,6 +49,8 @@ let stopComputers = null;
 let selected = new Set();
 let lastMove = '';
 let pendingMove = null;
+let history = []; // every action this game, so a move can be taken back by replaying the rest
+let replaying = false;
 
 // ---------- Preferences (best effort; the page works without storage) ----------
 
@@ -85,7 +87,7 @@ function loadRecords() {
 }
 
 /**
- * Saves a finished game under its day. The differential is the CPU's score minus
+ * Saves a finished game under its day. The differential is Alice's score minus
  * yours, so bigger is better and a positive number is a win on points.
  */
 function recordResult(dayOf, diff) {
@@ -108,10 +110,19 @@ const dayLabel = (key, opts = { weekday: 'long', day: 'numeric', month: 'long' }
 // ---------- Game lifecycle ----------
 
 function newGame() {
-  stopComputers?.();
   day = dayKey();
   seed = seedForDay(day);
+  startGame();
+}
+
+/**
+ * Deals the day's game and replays `actions` into it. The deal and the computer are
+ * deterministic, so replaying all but the last moves is how a move is undone.
+ */
+function startGame(actions = []) {
+  stopComputers?.();
   outcome = null;
+  history = [];
   game = new Game({ players: PLAYERS, cardsPerColor: PER_SUIT, random: seededRandom(seed) });
   selected.clear();
   lastMove = '';
@@ -121,6 +132,7 @@ function newGame() {
   game.on(GameEvent.CARD_PLAYED, onCardPlayed);
   game.on(GameEvent.STATE, (s) => {
     state = s;
+    if (replaying) return;
     render();
     if (pendingMove) animateMove(pendingMove);
     pendingMove = null;
@@ -133,16 +145,45 @@ function newGame() {
     const [mine, theirs] = [HUMAN, CPU].map((i) => results.scores.find((s) => s.player === i).score);
     outcome = recordResult(day, theirs - mine);
     const cpu = game.getState().players[CPU];
-    log(`CPU kept ${cpu.kept.map(fmt).join(' ')} and discarded ${cpu.discarded.map(fmt).join(' ')}.`);
+    log(`Alice kept ${cpu.kept.map(fmt).join(' ')} and discarded ${cpu.discarded.map(fmt).join(' ')}.`);
   });
 
-  stopComputers = attachComputerPlayers(game, [CPU], { delay: CPU_DELAY_MS });
   game.start();
   $('seedNote').textContent = `Deal of ${dayLabel(day)} · seed ${seed}`;
-  log(`Deal of ${dayLabel(day)}. ${state.currentPlayer === HUMAN ? 'You start.' : 'CPU starts.'}`);
+  log(`Deal of ${dayLabel(day)}. ${state.currentPlayer === HUMAN ? 'You start.' : 'Alice starts.'}`);
+  replaying = true;
+  for (const action of actions) dispatch(action);
+  replaying = false;
+  render();
+  stopComputers = attachComputerPlayers(game, [CPU], { delay: CPU_DELAY_MS });
 }
 
-const nameOf = (i) => (i === HUMAN ? 'You' : 'CPU');
+function dispatch(action) {
+  if (action.player === HUMAN && action.type === ActionType.DISCARD_CARDS) {
+    const hand = game.getStateFor(HUMAN).players[HUMAN].hand;
+    const kept = hand.filter((c) => !action.cardIds.includes(c.id));
+    const discarded = hand.filter((c) => action.cardIds.includes(c.id));
+    log(`You kept ${kept.map(fmt).join(' ')} and discarded ${discarded.map(fmt).join(' ')}.`);
+    history.push(action);
+  }
+  return game.dispatch(action);
+}
+
+/** Your last move, and Alice's reply if she has made one, until the game is over. */
+const canUndo = () => state?.phase !== Phase.FINISHED && history.some((a) => a.player === HUMAN);
+
+function undo() {
+  if (!canUndo()) return;
+  const last = history.findLastIndex((a) => a.player === HUMAN);
+  const replies = history.slice(last + 1).length;
+  startGame(history.slice(0, last));
+  selected.clear();
+  lastMove = replies ? 'Took back your move and Alice’s reply' : 'Took back your move';
+  log(`${lastMove}.`);
+  render();
+}
+
+const nameOf = (i) => (i === HUMAN ? 'You' : 'Alice');
 const fmt = (c) => `${SUIT[c.color]}${c.value}`;
 const human = () => state.players[HUMAN];
 const myTurn = () => state.phase === Phase.PLAY && state.currentPlayer === HUMAN;
@@ -155,9 +196,11 @@ function log(text) {
 }
 
 function onCardPlayed({ player, card, removed, drew }) {
+  history.push({ type: ActionType.PLAY_CARD, player, cardId: card.id });
   const took = removed.length ? `took ${removed.length}` : 'took nothing';
   lastMove = `${nameOf(player)} played ${fmt(card)} and ${took}` + (drew ? '' : ' (no draw)');
   log(`${lastMove}${removed.length ? `: ${removed.map(fmt).join(' ')}` : ''}.`);
+  if (replaying) return;
   // Remember where things are now, so the next render can animate from here.
   pendingMove = {
     player,
@@ -192,13 +235,15 @@ function act() {
   if (myTurn() && selected.size === 1) {
     const [cardId] = selected;
     selected.clear();
-    game.dispatch({ type: ActionType.PLAY_CARD, player: HUMAN, cardId });
+    dispatch({ type: ActionType.PLAY_CARD, player: HUMAN, cardId });
   } else if (myDiscard() && selected.size === KEEP_COUNT) {
-    const kept = human().hand.filter((c) => selected.has(c.id));
-    const discarded = human().hand.filter((c) => !selected.has(c.id));
+    const action = {
+      type: ActionType.DISCARD_CARDS,
+      player: HUMAN,
+      cardIds: human().hand.filter((c) => !selected.has(c.id)).map((c) => c.id),
+    };
     selected.clear();
-    log(`You kept ${kept.map(fmt).join(' ')} and discarded ${discarded.map(fmt).join(' ')}.`);
-    game.dispatch({ type: ActionType.DISCARD_CARDS, player: HUMAN, cardIds: discarded.map((c) => c.id) });
+    dispatch(action);
   } else if (state?.phase === Phase.FINISHED) {
     showResults();
   }
@@ -251,6 +296,7 @@ function render() {
   renderParade(preview);
   renderStatus(preview);
   renderHand();
+  $('undoBtn').disabled = !canUndo();
 }
 
 function renderSide(i, live) {
@@ -274,7 +320,7 @@ function renderSide(i, live) {
 
   if (i === CPU) {
     const finished = state.phase === Phase.FINISHED;
-    // Once the CPU has chosen its discards it still holds its four cards until the reveal.
+    // Once Alice has chosen her discards it still holds its four cards until the reveal.
     const held = p.hand.length || finished ? p.hand : [...(p.kept ?? []), ...(p.discarded ?? [])];
     const showHand = prefs.showCpu && held.length;
     $('cpuHand').classList.toggle('open', Boolean(showHand));
@@ -379,7 +425,7 @@ function renderStatus(preview) {
   $('lastMove').textContent = lastMove;
 
   if (state.phase === Phase.PLAY && state.currentPlayer === CPU) {
-    prompt.textContent = 'The CPU is pondering…';
+    prompt.textContent = 'Alice is pondering…';
   } else if (state.phase === Phase.PLAY && preview) {
     const n = preview.removedIds.size;
     prompt.innerHTML = n
@@ -401,11 +447,11 @@ function renderStatus(preview) {
       prompt.textContent = `Pick ${KEEP_COUNT} cards to keep (${selected.size}/${KEEP_COUNT}); the rest are discarded`;
     }
   } else if (state.phase === Phase.DISCARD) {
-    prompt.textContent = 'CPU is discarding…';
+    prompt.textContent = 'Alice is choosing her cards…';
   } else {
     const cpu = state.players[CPU];
     $('lastMove').textContent = `The end. ${winnerText(state.results)}`;
-    prompt.textContent = `The CPU kept ${cpu.kept.map(fmt).join(' ')} and discarded ${cpu.discarded.map(fmt).join(' ')}`;
+    prompt.textContent = `Alice kept ${cpu.kept.map(fmt).join(' ')} and discarded ${cpu.discarded.map(fmt).join(' ')}`;
     btn.hidden = false;
     btn.textContent = 'See results';
   }
@@ -427,7 +473,7 @@ function renderHand() {
   if (!cards.length) {
     const note = document.createElement('div');
     note.className = 'hand-note';
-    note.textContent = myDiscard() ? '' : 'Waiting for the CPU…';
+    note.textContent = myDiscard() ? '' : 'Waiting for Alice…';
     hand.replaceChildren(note);
     return;
   }
@@ -498,14 +544,14 @@ function animateMove({ player, card, removed, from, paradeRects }) {
 
 function winnerText({ winners }) {
   if (winners.length > 1) return 'It’s a tie!';
-  return winners[0] === HUMAN ? 'You win!' : 'CPU wins';
+  return winners[0] === HUMAN ? 'You win!' : 'Alice wins';
 }
 
 function showResults() {
   if (!state?.results) return;
   const { scores, majorities, winners } = state.results;
   $('resultTitle').textContent = winners.length > 1 ? 'Everybody has won, and all must have prizes!'
-    : winners[0] === HUMAN ? 'O frabjous day! You win.' : 'Off with your head! The CPU wins.';
+    : winners[0] === HUMAN ? 'O frabjous day! You win.' : 'Off with your head! Alice wins.';
   $('scoreLine').innerHTML = scores.map((s) => `
     <div class="score-box${winners.includes(s.player) ? ' win' : ''}">
       <div class="l">${nameOf(s.player)}${winners.includes(s.player) ? ' 🏆' : ''}</div>
@@ -580,7 +626,7 @@ function renderHistory() {
       + `<td>${plays(rec.plays)}</td></tr>`;
   });
   $('history').innerHTML = `<table class="history"><tbody>${rows.join('')}</tbody></table>
-    <p class="field-note">Best differential is the CPU’s score minus yours: higher is better.</p>`;
+    <p class="field-note">Best differential is Alice’s score minus yours: higher is better.</p>`;
 }
 
 /** Keeps the date labels right when the page is left open past midnight. */
@@ -664,6 +710,10 @@ $('showCpu').onchange = () => {
   prefs.showCpu = $('showCpu').checked;
   savePrefs();
   render();
+};
+$('undoBtn').onclick = (e) => {
+  e.stopPropagation();
+  undo();
 };
 $('actionBtn').onclick = (e) => {
   e.stopPropagation();

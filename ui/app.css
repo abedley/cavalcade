@@ -171,6 +171,18 @@ button { font: inherit; color: inherit; }
   padding: 0;
   font-size: 18px;
 }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.bar > * { flex: none; }
+.bar > .brand { flex: 0 1 auto; min-width: 0; }
+/* Narrow phones: the undo and menu buttons, the deck count and the name all on one line. */
+@media (max-width: 400px) {
+  .bar { gap: 6px; }
+  .brand { font-size: 22px; gap: 6px; }
+  .icon-btn { width: 36px; height: 36px; }
+}
+@media (max-width: 359px) {
+  .brand .logo { display: none; }
+}
 
 /* ---------- Player areas ---------- */
 
