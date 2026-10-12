@@ -532,15 +532,32 @@ dialog::backdrop { background: rgba(25, 15, 30, .5); }
 .field-note { font-weight: 400; font-size: 14px; font-style: italic; color: var(--muted); }
 output { font: 800 20px var(--numerals); font-variant-numeric: lining-nums tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
-input[type=number] {
-  font: inherit;
+
+/* The daily deal and your best score differential. */
+.daily {
+  display: grid;
+  gap: 4px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--line);
   background: var(--panel);
-  color: var(--fg);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 0 0 3px transparent, inset 0 0 0 4px var(--line);
 }
-input[type=number]::placeholder { color: var(--muted); font-style: italic; }
+.daily-date { font: italic 400 17px var(--display); color: var(--accent); }
+.daily-best { font-size: 16px; }
+.diff { font-family: var(--numerals); font-weight: 800; font-variant-numeric: lining-nums tabular-nums; }
+.diff.up { color: var(--accent); }
+.diff.down { color: var(--danger); }
+.daily-result { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; border: 1px dashed var(--line); }
+.daily-result[hidden] { display: none; }
+.daily-result > .diff { font-size: 32px; line-height: 1; min-width: 2ch; text-align: center; }
+.daily-result > span:last-child { display: grid; gap: 2px; }
+.daily-result.best { border: 1px solid var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.history { width: 100%; border-collapse: collapse; font-size: 15px; margin-top: 8px; }
+.history td { padding: 5px 4px; border-bottom: 1px solid var(--line); }
+.history td:nth-child(2), .history td:nth-child(4) { color: var(--muted); font-style: italic; }
+.history td.diff { text-align: right; font-size: 17px; }
+.history td:last-child { text-align: right; }
 
 .sheet-actions { display: flex; gap: 10px; justify-content: flex-end; }
 #setup .sheet-actions { flex-direction: row-reverse; justify-content: flex-start; }

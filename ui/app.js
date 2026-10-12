@@ -2,15 +2,19 @@ import {
   ActionType,
   attachComputerPlayers,
   COLORS,
+  dateOfKey,
+  dayKey,
   DISCARD_COUNT,
   Game,
   GameEvent,
   MAX_CARDS_PER_COLOR,
   minCardsPerColor,
+  msUntilMidnight,
   Phase,
   resolvePlay,
   score,
   seededRandom,
+  seedForDay,
 } from '../src/index.js';
 
 const HUMAN = 0;
@@ -39,6 +43,8 @@ const prefs = loadPrefs();
 let game = null;
 let state = null;
 let seed = null;
+let day = null; // the date of the deal being played, which can lag today's after midnight
+let outcome = null; // the finished game's differential and how it compares with the day's best
 let stopComputers = null;
 let selected = new Set();
 let lastMove = '';
@@ -63,12 +69,47 @@ function savePrefs() {
   }
 }
 
+// ---------- Daily records: { 'YYYY-MM-DD': { [cardsPerSuit]: { best, plays } } } ----------
+
+const records = loadRecords();
+
+function loadRecords() {
+  try {
+    return JSON.parse(localStorage.getItem('cavalcade-daily') ?? '{}') ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Saves a finished game under its day. The differential is the CPU's score minus
+ * yours, so bigger is better and a positive number is a win on points.
+ */
+function recordResult(dayOf, perSuit, diff) {
+  const prev = records[dayOf]?.[perSuit];
+  const rec = { best: prev ? Math.max(prev.best, diff) : diff, plays: (prev?.plays ?? 0) + 1 };
+  (records[dayOf] ??= {})[perSuit] = rec;
+  try {
+    localStorage.setItem('cavalcade-daily', JSON.stringify(records));
+  } catch {
+    // ignore
+  }
+  return { diff, ...rec, first: !prev, improved: Boolean(prev) && diff > prev.best };
+}
+
+const signed = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+const plays = (n) => `${n} ${n === 1 ? 'game' : 'games'}`;
+const dayLabel = (key, opts = { weekday: 'long', day: 'numeric', month: 'long' }) =>
+  dateOfKey(key).toLocaleDateString(undefined, opts);
+
 // ---------- Game lifecycle ----------
 
-function newGame({ perSuit = prefs.perSuit, seed: fixedSeed = null } = {}) {
+function newGame({ perSuit = prefs.perSuit } = {}) {
   stopComputers?.();
   clearTimeout(resultsTimer);
-  seed = fixedSeed ?? Math.floor(Math.random() * 1e6);
+  day = dayKey();
+  seed = seedForDay(day);
+  outcome = null;
   game = new Game({ players: PLAYERS, cardsPerColor: perSuit, random: seededRandom(seed) });
   selected.clear();
   lastMove = '';
@@ -87,13 +128,15 @@ function newGame({ perSuit = prefs.perSuit, seed: fixedSeed = null } = {}) {
   game.on(GameEvent.INVALID_ACTION, ({ message }) => log(`Invalid: ${message}`));
   game.on(GameEvent.GAME_OVER, (results) => {
     log(`Game over. ${winnerText(results)}`);
+    const [mine, theirs] = [HUMAN, CPU].map((i) => results.scores.find((s) => s.player === i).score);
+    outcome = recordResult(day, perSuit, theirs - mine);
     resultsTimer = setTimeout(showResults, reducedMotion.matches ? 300 : 1100);
   });
 
   stopComputers = attachComputerPlayers(game, [CPU], { delay: CPU_DELAY_MS });
   game.start();
-  $('seedNote').textContent = `Seed ${seed} · ${perSuit} cards per suit`;
-  log(`New game (seed ${seed}, ${perSuit} per suit). ${state.currentPlayer === HUMAN ? 'You start.' : 'CPU starts.'}`);
+  $('seedNote').textContent = `Deal of ${dayLabel(day)} · ${perSuit} cards per suit · seed ${seed}`;
+  log(`Deal of ${dayLabel(day)} (${perSuit} per suit). ${state.currentPlayer === HUMAN ? 'You start.' : 'CPU starts.'}`);
 }
 
 const nameOf = (i) => (i === HUMAN ? 'You' : 'CPU');
@@ -422,6 +465,7 @@ function showResults() {
       <div class="n">${s.score}</div>
       <div class="l">${s.cardCount} cards</div>
     </div>`).join('');
+  renderOutcome();
 
   const rows = COLORS.map((color) => {
     const cells = state.players.map((p, i) => {
@@ -443,11 +487,62 @@ function showResults() {
     <tfoot><tr><th>Total</th>${scores.map((s) => `<th>${s.cardCount}</th><th>${s.score}</th>`).join('')}</tr></tfoot>
   </table>
   <p class="field-note">✓ majority: those cards score 1 each. With two players you need at least 2 more cards of a
-    colour than your opponent. Lowest score wins; ties go to fewer cards. Seed ${seed}.</p>`;
+    colour than your opponent. Lowest score wins; ties go to fewer cards.
+    Deal of ${dayLabel(day, { day: 'numeric', month: 'long', year: 'numeric' })}.</p>`;
   if (!$('results').open) {
     $('results').returnValue = '';
     $('results').showModal();
   }
+}
+
+function renderOutcome() {
+  const el = $('dailyResult');
+  el.hidden = !outcome;
+  if (!outcome) return;
+  const today = day === dayKey();
+  const when = today ? 'today' : `on ${dayLabel(day)}`;
+  const note = outcome.improved ? `A new best for ${when}!`
+    : outcome.first ? `Your first game of ${today ? 'today’s' : 'that'} deal.`
+    : `Your best ${when}: ${signed(outcome.best)}`;
+  el.innerHTML = `<span class="diff ${outcome.diff > 0 ? 'up' : outcome.diff < 0 ? 'down' : ''}">${signed(outcome.diff)}</span>`
+    + `<span><b>Score differential</b><span class="field-note">${note} · ${plays(outcome.plays)} at ${state.cardsPerColor} per suit</span></span>`;
+  el.classList.toggle('best', outcome.improved);
+  // After midnight, "again" deals the new day's cards.
+  $('againBtn').textContent = today ? 'Play again' : 'Play today’s deal';
+}
+
+function renderDaily() {
+  const today = dayKey();
+  $('dailyDate').textContent = dayLabel(today);
+  const n = Number($('perSuit').value);
+  const rec = records[today]?.[n];
+  $('dailyBest').innerHTML = rec
+    ? `Your best at ${n} per suit: <b class="diff ${rec.best > 0 ? 'up' : rec.best < 0 ? 'down' : ''}">${signed(rec.best)}</b> · ${plays(rec.plays)}`
+    : `Not played yet at ${n} per suit.`;
+}
+
+function renderHistory() {
+  const days = Object.keys(records).sort().reverse().slice(0, 30);
+  if (!days.length) {
+    $('history').innerHTML = '<p class="field-note">No finished games yet. Your best score differential for each day will appear here.</p>';
+    return;
+  }
+  const rows = days.flatMap((d) => Object.entries(records[d])
+    .sort(([a], [b]) => b - a)
+    .map(([n, rec]) => `<tr><td>${dayLabel(d, { weekday: 'short', day: 'numeric', month: 'short' })}</td>`
+      + `<td>${n} per suit</td><td class="diff ${rec.best > 0 ? 'up' : rec.best < 0 ? 'down' : ''}">${signed(rec.best)}</td>`
+      + `<td>${plays(rec.plays)}</td></tr>`));
+  $('history').innerHTML = `<table class="history"><tbody>${rows.join('')}</tbody></table>
+    <p class="field-note">Best differential is the CPU’s score minus yours: higher is better.</p>`;
+}
+
+/** Keeps the date labels right when the page is left open past midnight. */
+function watchMidnight() {
+  setTimeout(() => {
+    renderDaily();
+    if (state?.results) renderOutcome();
+    watchMidnight();
+  }, msUntilMidnight() + 1000);
 }
 
 function openSetup() {
@@ -467,6 +562,7 @@ function updatePerSuit() {
   $('perSuitOut').textContent = n;
   $('perSuitNote').textContent = `Values 0–${n - 1} · ${n * COLORS.length}-card deck`
     + (n === MAX_CARDS_PER_COLOR ? ' (standard)' : '');
+  renderDaily();
 }
 
 for (const el of document.querySelectorAll('[data-rules]')) el.innerHTML = RULES;
@@ -477,8 +573,7 @@ $('setup').addEventListener('close', () => {
   if ($('setup').returnValue === 'start') {
     prefs.perSuit = Number($('perSuit').value);
     savePrefs();
-    const s = $('seed').value.trim();
-    newGame({ perSuit: prefs.perSuit, seed: s === '' ? null : Number(s) });
+    newGame({ perSuit: prefs.perSuit });
   } else if (!game) {
     openSetup(); // there has to be a game behind the sheet
   }
@@ -508,6 +603,7 @@ for (const dialog of document.querySelectorAll('dialog')) {
 }
 
 $('menuBtn').onclick = () => {
+  renderHistory();
   $('menu').returnValue = '';
   $('menu').showModal();
 };
@@ -553,5 +649,13 @@ $('app').addEventListener('click', () => {
 });
 
 new ResizeObserver(() => state && renderParade(playPreview())).observe($('parade'));
+
+// Phones pause timers in background tabs, so also check the date on return.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  renderDaily();
+  if (state?.results) renderOutcome();
+});
+watchMidnight();
 
 openSetup();
