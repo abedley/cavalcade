@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3e9d2">
+<script>
+  (function () {
+    var theme;
+    try { theme = JSON.parse(localStorage.getItem('cavalcade-prefs') || '{}').theme; } catch (e) {}
+    var dark = theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  })();
+</script>
+<title>Cavalcade Solver</title>
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=IM+Fell+English:ital@0;1&family=Playfair+Display:wght@700..900&display=swap">
+<link rel="stylesheet" href="../ui/app.css">
+<link rel="stylesheet" href="solver.css">
+</head>
+<body>
+<main class="solver">
+  <header class="solver-head">
+    <h1 class="title"><span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>Solver</h1>
+    <a class="back" href="../">Back to the game</a>
+  </header>
+  <p class="intro">Searches for the best score differential you can get against Alice in a day’s deal.
+    The deal and Alice are deterministic, so every line found here plays out exactly the same in the game.</p>
+
+  <section class="panel controls">
+    <label class="date-field">Deal of <input type="date" id="day"></label>
+    <span class="seed" id="seed"></span>
+    <div class="buttons">
+      <button class="btn" id="solveBtn">Solve</button>
+      <button class="btn secondary" id="stopBtn" hidden>Stop</button>
+    </div>
+    <p class="status" id="status" aria-live="polite">Ready.</p>
+  </section>
+
+  <section class="panel result" id="result" hidden>
+    <div class="best">
+      <span class="diff" id="bestDiff"></span>
+      <div>
+        <div class="best-scores" id="bestScores"></div>
+        <div class="best-note" id="bestNote"></div>
+      </div>
+    </div>
+    <ol class="line" id="line"></ol>
+  </section>
+
+  <section class="panel" id="roundsPanel" hidden>
+    <h2>Search rounds</h2>
+    <table class="rounds">
+      <thead><tr><th>Beam width</th><th>Positions</th><th>Time</th><th>Best in round</th></tr></thead>
+      <tbody id="rounds"></tbody>
+    </table>
+  </section>
+
+  <details class="panel about">
+    <summary>How it searches</summary>
+    <p>A true brute force is out of reach. A game gives you 6 to 14 turns with up to 5 cards to choose
+      from, which comes to around 10<sup>8</sup>–10<sup>9</sup> different games, and Alice looks five
+      plays ahead before each of her moves.</p>
+    <p>So the solver runs a <em>beam search</em> in rounds. At each of your turns it tries every card
+      from each position it is keeping, lets Alice reply as she would in the game, then keeps the
+      positions where you lead by the most. The first round keeps 10 positions per turn, and each
+      round keeps three times as many as the last. Wider rounds look at more of the game and usually
+      find better lines, but take about three times as long. At the end it tries every pair of cards
+      you could keep. The work is shared across your device’s processor cores.</p>
+    <p>The result is the best line found so far, not a proven best. Leave it running for a better
+      chance at the true best.</p>
+  </details>
+</main>
+<script type="module" src="solver.js"></script>
+</body>
+</html>

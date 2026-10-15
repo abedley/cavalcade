@@ -80,6 +80,12 @@ The look is a quiet nod to *Alice in Wonderland*:
 
 The page is plain HTML, CSS and JS in `index.html` and `ui/`, with no build step. Locally, run `python3 -m http.server` and open http://localhost:8000/. ES modules don't load from `file://`.
 
+## Solver
+
+`solver/` (https://abedley.github.io/cavalcade/solver/) searches a day's deal for the best score differential you can get against Alice. The deal and Alice are both deterministic, so the only choices in a game are yours, and every line it finds plays out exactly the same in the game.
+
+A full brute force isn't feasible: a game gives you 6 to 14 turns of up to 5 choices, around 10^8–10^9 games, and Alice searches five plays ahead before each of her moves. So `src/solver.js` runs a beam search. At each of your turns it tries every card from each position it is keeping, lets Alice reply, and keeps the positions where you lead by the most. At the end it tries every pair you could keep. The page runs rounds that keep 10, 30, 90… positions per turn, spread across Web Workers (`solver/worker.js`), and shows the best line found with every play, until you stop it. It remembers Alice's answer for each position she can see, so repeated positions cost nothing. Results are the best found, not proven optima; wider rounds usually do better. The best line for each day is saved in the browser. A test replays found lines through `Game` to check the solver follows the real rules.
+
 ## Development
 
 ```sh
